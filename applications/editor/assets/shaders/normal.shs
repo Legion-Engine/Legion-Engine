@@ -3,6 +3,7 @@
 generate(vertex, fragment)
 
 #include <stdio.shinc>
+#include <lighting_input.shinc>
 
 shader(vertex)
 {
@@ -15,10 +16,10 @@ shader(vertex)
 
 shader(fragment)
 {
-    out vec4 fragment_color;
-
     void main(void)
     {
-        fragment_color = vec4((abs(stdin(normal)) + clamp(stdin(normal), 0.0, 1.0) * 2) / 3, 1);
+        vec3 normal = NormalMap(material_input.normalHeight, stdio(uv), GetTBNMatrix());
+
+        fragment_color = vec4((abs(normal) + clamp(normal, 0.0, 1.0) * 2) / 3, 1);
     }
 }

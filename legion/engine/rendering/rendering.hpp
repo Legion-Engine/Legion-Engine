@@ -13,6 +13,8 @@
 #include <rendering/data/postprocessingeffect.hpp>
 #include <rendering/data/particle_system_base.hpp>
 #include <rendering/data/particle_system_cache.hpp>
+#include <rendering/util/gui.hpp>
+#include <rendering/pipeline/gui/stages/imguirenderstage.hpp>
 
 namespace legion
 {

@@ -87,6 +87,16 @@ namespace legion::core
             m_modules[priority].emplace_back(std::move(module));
         }
 
+        void reportModule(std::unique_ptr<Module>&& module)
+        {
+            module->m_ecs = &m_ecs;
+            module->m_scheduler = &m_scheduler;
+            module->m_eventBus = &m_eventbus;
+
+            const priority_type priority = module->priority();
+            m_modules[priority].emplace_back(std::move(module));
+        }
+
         /**@brief Calls init on all reported modules and thus engine internals.
          * @note Needs to be called manually if LEGION_ENTRY was not used.
          * @param argc argc of main

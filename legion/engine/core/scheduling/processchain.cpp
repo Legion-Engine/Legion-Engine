@@ -73,7 +73,7 @@ namespace legion::core::scheduling
     void ProcessChain::runInCurrentThread()
     {
         OPTICK_EVENT("Run process chain");
-        OPTICK_TAG("Process chain name", m_name.c_str());
+        OPTICK_TAG("Process chain", m_name.c_str());
 
         {
             async::readonly_guard guard(m_callbackLock);

@@ -16,8 +16,6 @@ shader(vertex)
 
 shader(fragment)
 {
-    out vec4 fragment_color;
-
     void main(void)
     {
         fragment_color = vec4(stdio(uv), 0, 1);

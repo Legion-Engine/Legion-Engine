@@ -42,19 +42,19 @@ namespace legion::core::async
 
         uint m_id = m_lastId.fetch_add(1, std::memory_order_relaxed);
         // State of the lock. -1 means that a thread has write permission. 0 means that the lock is unlocked. 1+ means that there are N amount of readers.
-        std::atomic_int m_lockState = { 0 };
+        mutable  std::atomic_int m_lockState = { 0 };
 
-        void read_lock();
+        void read_lock() const;
 
-        bool read_try_lock();
+        bool read_try_lock() const;
 
-        void write_lock();
+        void write_lock() const;
 
-        bool write_try_lock();
+        bool write_try_lock() const;
 
-        void read_unlock();
+        void read_unlock() const;
 
-        void write_unlock();
+        void write_unlock() const;
 
     public:
         static void force_release(bool release = true);
@@ -74,7 +74,7 @@ namespace legion::core::async
          *		 Locking for write multiple times will remain in write.
          * @param permissionLevel
          */
-        void lock(lock_state permissionLevel = lock_state::write);
+        void lock(lock_state permissionLevel = lock_state::write) const;
 
         /**@brief Try to lock for a certain permission level. If it fails it will return false otherwise true. (locking for idle does nothing)
          * @note Locking stacks, locking for readonly multiple times will remain readonly.
@@ -83,25 +83,25 @@ namespace legion::core::async
          * @param permissionLevel
          * @return bool True when locked.
          */
-        bool try_lock(lock_state permissionLevel = lock_state::write);
+        bool try_lock(lock_state permissionLevel = lock_state::write) const;
 
         /**@brief Unlock from a certain permission level.
          * @note If both read and write locks have been requested before and write is unlocked then the lock will return to readonly state.
          * @param permissionLevel
          */
-        void unlock(lock_state permissionLevel = lock_state::write);
+        void unlock(lock_state permissionLevel = lock_state::write) const;
 
         /** @brief Locks the rw_spinlockfor shared ownership, blocks if the rw_spinlockis not available
          */
-        void lock_shared();
+        void lock_shared() const;
 
         /** @brief Tries to lock the rw_spinlockfor shared ownership, returns if the rw_spinlockis not available
          */
-        bool try_lock_shared();
+        bool try_lock_shared() const;
 
         /** @brief Unlocks the mutex (shared ownership)
          */
-        void unlock_shared();
+        void unlock_shared() const;
 
         /**@brief Execute a function inside a critical section locked by a certain guard.
          * @tparam Guard Guard type to lock the lock with.
@@ -109,7 +109,7 @@ namespace legion::core::async
          * @return Return value of func.
          */
         template<typename Guard, typename Func>
-        auto critical_section(const Func& func) -> decltype(auto)
+        auto critical_section(const Func& func) const -> decltype(auto)
         {
             Guard guard(*this);
             return std::invoke(func);
@@ -125,12 +125,12 @@ namespace legion::core::async
     class readonly_guard final
     {
     private:
-        rw_spinlock& m_lock;
+        const rw_spinlock& m_lock;
 
     public:
         /**@brief Creates readonly guard and locks for Read-only.
          */
-        readonly_guard(rw_spinlock& lock) : m_lock(lock)
+        readonly_guard(const rw_spinlock& lock) : m_lock(lock)
         {
             m_lock.lock(read);
         }
@@ -157,13 +157,13 @@ namespace legion::core::async
     class readonly_multiguard final
     {
     private:
-        std::array<rw_spinlock*, S> m_locks;
+        std::array<const rw_spinlock*, S> m_locks;
 
     public:
         /**@brief Creates readonly multi-guard and locks for Read-only.
          */
         template<typename lock_type1 = rw_spinlock, typename lock_type2 = rw_spinlock, typename... lock_typesN>
-        readonly_multiguard(lock_type1& lock1, lock_type2& lock2, lock_typesN&... locks) : m_locks{ {&lock1, &lock2, &locks...} }
+        readonly_multiguard(const lock_type1& lock1, const lock_type2& lock2, const lock_typesN&... locks) : m_locks{ {&lock1, &lock2, &locks...} }
         {
             int lastLocked = -1; // Index to the last locked lock.
 
@@ -199,7 +199,7 @@ namespace legion::core::async
          */
         ~readonly_multiguard()
         {
-            for (rw_spinlock* lock : m_locks)
+            for (auto* lock : m_locks)
                 lock->unlock(read);
         }
 
@@ -219,12 +219,12 @@ namespace legion::core::async
     class readwrite_guard final
     {
     private:
-        rw_spinlock& m_lock;
+        const rw_spinlock& m_lock;
 
     public:
         /**@brief Creates read-write guard and locks for Read-Write.
          */
-        readwrite_guard(rw_spinlock& lock) : m_lock(lock)
+        readwrite_guard(const rw_spinlock& lock) : m_lock(lock)
         {
             m_lock.lock(write);
         }
@@ -252,13 +252,13 @@ namespace legion::core::async
     class readwrite_multiguard final
     {
     private:
-        std::array<rw_spinlock*, S> m_locks;
+        std::array<const rw_spinlock*, S> m_locks;
 
     public:
         /**@brief Creates read-write multi-guard and locks for Read-Write.
          */
         template<typename lock_type1, typename lock_type2, typename... lock_typesN>
-        readwrite_multiguard(lock_type1& lock1, lock_type2& lock2, lock_typesN&... locks) : m_locks{ {&lock1, &lock2, &locks...} }
+        readwrite_multiguard(const lock_type1& lock1, const lock_type2& lock2, const lock_typesN&... locks) : m_locks{ {&lock1, &lock2, &locks...} }
         {
             int lastLocked = -1; // Index to the last locked lock.
 
@@ -294,7 +294,7 @@ namespace legion::core::async
          */
         ~readwrite_multiguard()
         {
-            for (rw_spinlock* lock : m_locks)
+            for (auto* lock : m_locks)
                 lock->unlock(write);
         }
 
@@ -316,12 +316,12 @@ namespace legion::core::async
     class mixed_multiguard final
     {
     private:
-        std::array<rw_spinlock*, S / 2> m_locks;
+        std::array<const rw_spinlock*, S / 2> m_locks;
         std::array<lock_state, S / 2> m_states;
 
         // Recursive function for filling the arrays with the neccessary data from the template arguments.
         template<size_type I, typename... types>
-        void fill(rw_spinlock& lock, lock_state state, types&&... args)
+        void fill(const rw_spinlock& lock, lock_state state, types&&... args)
         {
             if constexpr (I > 2)
             {

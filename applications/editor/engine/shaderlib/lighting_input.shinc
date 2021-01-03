@@ -2,10 +2,54 @@
 //  Lighting Input  //
 //////////////////////
 
+#if !defined(LIGHTING_INCL)
+#define ENUM uint
+
+#define point_light 0
+#define directional_light 1
+#define spot_light 2
+
+struct Light
+{
+	ENUM type;			// 4	0
+	float attenuation;	// 4	4
+	float intensity;	// 4	8
+	uint index;			// 4	12
+	vec3 direction;		// 12	16
+	float falloff;		// 4	28
+	vec3 position;		// 12	32
+	float angle;		// 4	44
+	vec3 color;		    // 12	48
+	float meta;		    // 4	60
+};
+
+struct Material
+{
+    mat3 tbn;
+    float height;
+    vec4 albedo;
+ 	vec3 normal;
+ 	float metallic;
+	vec3 emissive;
+    float roughness;
+    float dielectric;
+ 	float ambientOcclusion;
+    vec2 texcoords;
+    vec3 F0;
+};
+
+vec3 Fresnel0(vec4 albedo, float metallic, float dielectric)
+{
+    return mix(dielectric.xxx, albedo.rgb, metallic.xxx);
+}
+#endif
+
 layout(std140, binding = SV_LIGHTS) readonly buffer LightsBuffer
 {
 	Light lights[];
 };
+
+uniform uint _L_light_count : SV_LIGHTCOUNT;
 
 struct MaterialInput
 {
@@ -21,30 +65,31 @@ uniform MaterialInput material_input : SV_MATERIAL;
 
 Material ExtractMaterial(vec2 uv, Camera camera, vec3 worldNormal, vec3 worldTangent)
 {
-    mat3 tbn = GetTBNMatrix(worldNormal, worldTangent);
-
-    vec2 texcoords = ParallaxMap(material_input.normalHeight, material_input.heightScale, uv, camera, tbn);
-
     Material material;
-    material.albedo = AlbedoMap(material_input.albedo, texcoords);
-    material.normal = NormalMap(material_input.normalHeight, texcoords, tbn);
-    vec4 MRDAo = LightingData(material_input.MRDAo, texcoords);
-    material.metallic = MRDAo.r;
+    material.tbn = GetTBNMatrix(worldNormal, worldTangent);
+    material.texcoords = ParallaxMap(material_input.normalHeight, material_input.heightScale, uv, camera, material.tbn, material.height);
+    material.albedo = AlbedoMap(material_input.albedo, material.texcoords);
+    material.normal = NormalMap(material_input.normalHeight, material.texcoords, material.tbn);
+    vec4 MRDAo = LightingData(material_input.MRDAo, material.texcoords);
+    material.metallic = min(MRDAo.r, 1.0 - epsilon);
     material.roughness = MRDAo.g;
     material.dielectric = MRDAo.b;
     material.ambientOcclusion = MRDAo.a;
- 	material.emissive = EmissiveMap(material_input.emissive, texcoords);
     material.F0 = Fresnel0(material.albedo, material.metallic, material.dielectric);
+ 	material.emissive = EmissiveMap(material_input.emissive, material.texcoords);
 
     return material;
 }
 
-vec3 GetAllLighting(Material material, Camera camera, vec3 worldPosition, vec3 worldNormal)
+
+#if defined(LIGHTING_INCL)
+vec3 GetAllLighting(Material material, Camera camera, vec3 worldPosition)
 {
     vec3 lighting = vec3(0.0);
 
-    for(int i = 0; i < lights.length(); i++)
-        lighting += CalculateLight(lights[i], camera, material, worldPosition, worldNormal);
+    for(int i = 0; i < _L_light_count; i++)
+        lighting += CalculateLight(lights[i], camera, material, worldPosition);
 
     return lighting + GetAmbientLight(material.ambientOcclusion, material.albedo.rgb) + material.emissive;
 }
+#endif

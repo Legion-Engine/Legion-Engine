@@ -204,6 +204,7 @@ namespace legion::application
 
     void ContextHelper::swapBuffers(GLFWwindow* window)
     {
+        OPTICK_EVENT();
         if (initialized())
             glfwSwapBuffers(window);
     }

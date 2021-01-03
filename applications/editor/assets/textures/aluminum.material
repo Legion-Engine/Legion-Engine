@@ -1,0 +1,7 @@
+[PBR]
+material_input.albedo=aluminum-albedo.png
+material_input.normalHeight=aluminum-normalHeight.png
+material_input.MRDAo=aluminum-MRDAo.png
+material_input.emissive=aluminum-emissive.png
+material_input.heightScale=1.0
+discardExcess=false

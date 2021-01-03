@@ -1,0 +1,66 @@
+#version 450
+
+generate(vertex, fragment)
+
+#include <stdio.shinc>
+
+
+shader(vertex)
+{
+
+    layout (location = 0) in vec2 aPos;
+    layout (location = 1) in vec2 aTexCoords;
+
+    out vec2 TexCoords;
+    void main(void)
+    {
+        TexCoords = aTexCoords;
+        gl_Position = vec4(aPos.x, aPos.y, 1.0, 1.0);
+    }
+}
+
+
+shader(fragment)
+{
+    out vec4 FragColor;
+
+    in vec2 TexCoords;
+
+    uniform sampler2D screenTexture;
+
+    void main(void)
+    {
+        const ivec2 texSize = textureSize(screenTexture, 0);
+        vec2 offset = vec2(2.0 / texSize.x, 2.0 / texSize.y);
+
+        vec2 offsets[9] = vec2[](
+        vec2(-offset.x,  offset.y), // top-left
+        vec2( 0.0f,    offset.y), // top-center
+        vec2( offset.x,  offset.y), // top-right
+        vec2(-offset.x,  0.0f),   // center-left
+        vec2( 0.0f,    0.0f),   // center-center
+        vec2( offset.x,  0.0f),   // center-right
+        vec2(-offset.x, -offset.y), // bottom-left
+        vec2( 0.0f,   -offset.y), // bottom-center
+        vec2( offset.x, -offset.y)  // bottom-right
+        );
+
+        float kernel[9] = float[](
+        1, 1, 1,
+        1, -8, 1,
+        1, 1, 1
+        );
+
+        vec3 sampleTex[9];
+        for(int i = 0; i < 9; i++)
+        {
+            sampleTex[i] = texture(screenTexture, TexCoords + offsets[i]).rgb;
+        }
+        vec3 col = vec3(0.0);
+        for(int i = 0; i < 9; i++)
+            col += sampleTex[i] * kernel[i];
+
+        FragColor = vec4(col, 1.0);
+    }
+}
+

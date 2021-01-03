@@ -1,0 +1,9 @@
+[pbr]
+material_input.albedo=../textures/aluminum/aluminum-albedo.png
+material_input.normalHeight=../textures/aluminum/aluminum-normalHeight.png
+material_input.MRDAo=../textures/aluminum/aluminum-MRDAo.png
+material_input.emissive=../textures/aluminum/aluminum-emissive.png
+material_input.heightScale=0.0
+discardExcess=false
+tonemap=false
+skycolor=1.0 0.0 1.0 1.0

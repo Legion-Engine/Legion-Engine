@@ -17,8 +17,6 @@ shader(vertex)
 shader(fragment)
 {
     uniform sampler2D _texture;
-    out vec4 fragment_color;
-
     void main(void)
     {
         fragment_color = texture(_texture, stdio(uv));

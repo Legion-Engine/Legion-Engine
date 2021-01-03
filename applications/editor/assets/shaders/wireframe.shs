@@ -45,8 +45,6 @@ shader(fragment)
         vec3 barycentricCoords;
     } inData;
 
-    out vec4 fragment_color;
-
     void main(void)
     {
         vec3 deltas = fwidth(inData.barycentricCoords);

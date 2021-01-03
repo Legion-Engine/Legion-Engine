@@ -8,6 +8,8 @@
 
 namespace legion::rendering
 {
+    class RenderStageBase;
+
     class RenderPipelineBase
     {
         friend class Renderer;
@@ -23,10 +25,16 @@ namespace legion::rendering
 
         static std::atomic_bool m_exiting;
 
+        virtual void injectStageImpl(std::unique_ptr<RenderStageBase>&& stage) LEGION_PURE;
+
     public:
         static void exit();
 
         void abort();
+
+        template<typename StageType, typename... Args>
+        void injectStage(Args&&... args) { injectStageImpl(std::unique_ptr<RenderStageBase>(new StageType(std::forward<Args>(args)...))); }
+        void injectStage(std::unique_ptr<RenderStageBase>&& stage) { injectStageImpl(std::forward<std::unique_ptr<RenderStageBase>&&>(stage)); }
 
         template<typename T>
         L_NODISCARD bool has_meta(const std::string& name);

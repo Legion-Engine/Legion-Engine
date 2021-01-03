@@ -183,12 +183,14 @@ namespace legion::core::ecs
         return queryId;
     }
 
-    entity_set QueryRegistry::getEntities(id_type queryId)
+    entity_set QueryRegistry::getEntities(id_type queryId) const
     {
         OPTICK_EVENT();
         async::readonly_guard entguard(m_entityLock);
-        entity_set copy = *m_entityLists.get(queryId);
-        return copy;
+
+        auto& ret = m_entityLists.get(queryId);
+        OPTICK_EVENT("Copy entity set");
+        return *ret;
     }
 
     void QueryRegistry::addReference(id_type queryId)

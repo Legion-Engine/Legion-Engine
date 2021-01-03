@@ -3,13 +3,13 @@
 namespace legion::rendering
 {
     async::spinlock DebugRenderStage::debugLinesLock;
-    thread_local std::unordered_set<debug::debug_line_event>* DebugRenderStage::localLines;
-    std::unordered_map<std::thread::id, std::unordered_set<debug::debug_line_event>*> DebugRenderStage::debugLines;
+    thread_local std::unordered_set<debug::debug_line>* DebugRenderStage::localLines;
+    std::unordered_map<std::thread::id, std::unordered_set<debug::debug_line>*> DebugRenderStage::debugLines;
 
     void DebugRenderStage::startDebugDomain()
     {
         if (!localLines)
-            localLines = new std::unordered_set<debug::debug_line_event>();
+            localLines = new std::unordered_set<debug::debug_line>();
     }
 
     void DebugRenderStage::endDebugDomain()
@@ -39,13 +39,13 @@ namespace legion::rendering
             localLines = nullptr;
         }
 
-        localLines = new std::unordered_set<debug::debug_line_event>();
+        localLines = new std::unordered_set<debug::debug_line>();
         localLines->reserve(size);
     }
 
     void DebugRenderStage::drawDebugLine(events::event_base* event)
     {
-        debug::debug_line_event* line = reinterpret_cast<debug::debug_line_event*>(event);
+        debug::debug_line* line = reinterpret_cast<debug::debug_line*>(event);
         if (localLines->count(*line))
             localLines->erase(*line);
         localLines->insert(*line);
@@ -62,14 +62,14 @@ namespace legion::rendering
     {
         using namespace legion::core::fs::literals;
 
-        std::vector<debug::debug_line_event> lines;
+        std::vector<debug::debug_line> lines;
 
         {
             std::lock_guard guard(debugLinesLock);
             if (debugLines.size() == 0)
                 return;
 
-            std::vector<debug::debug_line_event> toRemove;
+            std::vector<debug::debug_line> toRemove;
             for (auto& [threadId, domain] : debugLines)
             {
                 lines.insert(lines.end(), domain->begin(), domain->end());

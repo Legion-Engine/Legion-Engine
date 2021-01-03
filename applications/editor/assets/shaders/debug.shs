@@ -22,8 +22,6 @@ shader(vertex)
 
 shader(fragment)
 {
-    out vec4 fragment_color;
-
     void main(void)
     {
         fragment_color = sharedData.color;

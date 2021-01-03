@@ -6,6 +6,7 @@
 in vec3 position : SV_POSITION;
 in vec3 normal : SV_NORMAL;
 in vec3 tangent : SV_TANGENT;
+in vec4 vertexcolor : SV_COLOR;
 in vec2 uv : SV_TEXCOORD0;
 in mat4 modelMatrix : SV_MODELMATRIX;
 #endif
@@ -30,6 +31,7 @@ io _L_STDIO
 {
     vec3 position;
     vec3 wvertex;
+    vec4 vertexcolor;
     vec3 normal;
     vec3 wnormal;
     vec3 tangent;
@@ -47,6 +49,7 @@ out _L_STDGEOMFRAG
 {
     vec3 position;
     vec3 wvertex;
+    vec4 vertexcolor;
     vec3 normal;
     vec3 wnormal;
     vec3 tangent;
@@ -74,8 +77,9 @@ struct Camera
     mat4 viewMatrix;
     mat4 projectionMatrix;
     vec3 position;
-    uint index;
+    float farz;
     vec3 viewDirection;
+    float nearz;
     #if defined(GEOMETRY_SHADER)
     vec3 toView[_L_geom_vtxc];
     #else
@@ -87,12 +91,16 @@ struct CameraInput
 {
     mat4 view;
     mat4 proj;
-    vec4 posmeta;
-    vec4 vdirmeta;
-    uint idx;
+    vec4 posnearz;
+    vec4 vdirfarz;
+    ivec2 viewportSize;
 };
 
 uniform CameraInput _L_cmr_in : SV_CAMERA;
+
+uniform sampler2D _L_sceneDepth : SV_SCENEDEPTH;
+uniform sampler2D _L_sceneColor : SV_SCENECOLOR;
+uniform sampler2D _L_hdrOverdraw : SV_HDROVERDRAW;
 
 #define ViewMatrix _L_cmr_in.view;
 #define ProjectionMatrix _L_cmr_in.proj;
@@ -100,12 +108,12 @@ uniform CameraInput _L_cmr_in : SV_CAMERA;
 
 vec4 WorldToScreenSpacePosition(vec3 pos)
 {
-    return ((_L_cmr_in.proj * _L_cmr_in.view) * vec4(pos, 1.f));
+    return (ViewProjectionMatrix * vec4(pos, 1.f));
 }
 
 vec4 WorldToScreenSpacePosition(vec4 pos)
 {
-    return ((_L_cmr_in.proj * _L_cmr_in.view) * pos);
+    return (ViewProjectionMatrix * pos);
 }
 
 Camera GetCamera()
@@ -113,9 +121,10 @@ Camera GetCamera()
     Camera camera;
     camera.viewMatrix = _L_cmr_in.view;
     camera.projectionMatrix = _L_cmr_in.proj;
-    camera.position = _L_cmr_in.posmeta.xyz;
-    camera.index = _L_cmr_in.idx;
-    camera.viewDirection = _L_cmr_in.vdirmeta.xyz;
+    camera.position = _L_cmr_in.posnearz.xyz;
+    camera.nearz = _L_cmr_in.posnearz.w;
+    camera.viewDirection = _L_cmr_in.vdirfarz.xyz;
+    camera.farz = _L_cmr_in.vdirfarz.w;
     #if defined(VERTEX_SHADER)
     camera.toView = camera.position - (modelMatrix * vec4(position, 1.0)).xyz;
     #elif defined(FRAGMENT_SHADER)
@@ -130,11 +139,77 @@ Camera GetCamera()
 vec4 ModelToScreenSpacePosition(vec3 pos)
 {
     #if defined(GEOMETRY_SHADER)
-    return (_L_cmr_in.proj * _L_cmr_in.view * stdin(0, modelMatrix)) * vec4(pos, 1.f);
+    return (ViewProjectionMatrix * stdin(0, modelMatrix)) * vec4(pos, 1.f);
     #else
-    return (_L_cmr_in.proj * _L_cmr_in.view * stdio(modelMatrix)) * vec4(pos, 1.f);
+    return (ViewProjectionMatrix * stdio(modelMatrix)) * vec4(pos, 1.f);
     #endif
 }
+
+vec3 SceneColor(vec2 uv)
+{
+    return texture(_L_sceneColor, uv).rgb;
+}
+
+vec3 SceneDepth(vec2 uv)
+{
+    return texture(_L_sceneDepth, uv).rgb;
+}
+
+float LinearDepth(float depth)
+{
+   return 0.0;// return _L_cmr_in.nearz * _L_cmr_in.farz / (_L_cmr_in.farz + depth * (_L_cmr_in.nearz - _L_cmr_in.farz));
+}
+
+#if defined(FRAGMENT_SHADER)
+
+#define SV_FRAGMENTOUT 0
+#define SV_HDROVERDRAWOUT 1
+
+#if !defined(NO_DEFAULT_OUT)
+out vec4 fragment_color : SV_FRAGMENTOUT;
+#endif
+
+#if !defined(NO_DEPTH_OUT)
+out float gl_FragDepth;
+
+#define fragment_depth gl_FragDepth
+#endif
+
+in vec4 gl_FragCoord;
+
+vec2 ScreenUV()
+{
+    return gl_FragCoord.xy / _L_cmr_in.viewportSize;
+}
+
+vec3 SceneColor()
+{
+    return texture(_L_sceneColor, gl_FragCoord.xy / _L_cmr_in.viewportSize).rgb;
+}
+
+vec3 SceneDepth()
+{
+    return texture(_L_sceneDepth, gl_FragCoord.xy / _L_cmr_in.viewportSize).rgb;
+}
+
+float LinearDepth()
+{
+    return 0.0;
+    //float depth = texture(_L_sceneDepth, gl_FragCoord.xy / _L_cmr_in.viewportSize).r;
+
+    //return _L_cmr_in.nearz * _L_cmr_in.farz / (_L_cmr_in.farz + depth * (_L_cmr_in.nearz - _L_cmr_in.farz));
+}
+
+bool DepthCull(float depth)
+{
+    #if defined(DEPTH_ONLY)
+    return true;
+    #else
+    //return LinearDepth() <= LinearDepth(depth) + 0.0001;
+    return false;
+    #endif
+}
+#endif
 
 #if defined(GEOMETRY_SHADER)  // Geometry shader
 vec3 GetWorldPosition(int index)
@@ -191,21 +266,21 @@ mat3 GetTBNMatrix(int index)
     vec3 worldNormal = GetWorldNormal(index);
 	vec3 worldTangent = GetWorldTangent(index, worldNormal);
 	vec3 worldBitangent = GetWorldBitangent(worldNormal, worldTangent);
-	return mat3(worldTangent, worldBitangent, worldNormal);
+	return transpose(mat3(worldTangent, worldBitangent, worldNormal));
 }
 
 mat3 GetTBNMatrix(vec3 worldNormal, vec3 worldTangent)
 {
     vec3 orthogonalizedTangent = normalize(worldTangent - dot(worldTangent, worldNormal) * worldNormal);
 	vec3 worldBitangent = GetWorldBitangent(worldNormal, orthogonalizedTangent);
-	return mat3(orthogonalizedTangent, worldBitangent, worldNormal);
+	return transpose(mat3(orthogonalizedTangent, worldBitangent, worldNormal));
 }
 
 #else // Not geometry shader
 vec3 GetWorldPosition()
 {
 #if defined(FRAGMENT_SHADER)
-    return normalize(_L_stdio.wvertex);
+    return _L_stdio.wvertex;
 #elif defined(VERTEX_SHADER)
     return (stdio(modelMatrix) * vec4(stdio(position), 1.0)).xyz;
 #endif
@@ -274,14 +349,14 @@ mat3 GetTBNMatrix()
     vec3 worldNormal = GetWorldNormal();
 	vec3 worldTangent = GetWorldTangent(worldNormal);
 	vec3 worldBitangent = GetWorldBitangent(worldNormal, worldTangent);
-	return mat3(worldTangent, worldBitangent, worldNormal);
+	return transpose(mat3(worldTangent, worldBitangent, worldNormal));
 }
 
 mat3 GetTBNMatrix(vec3 worldNormal, vec3 worldTangent)
 {
     vec3 orthogonalizedTangent = normalize(worldTangent - dot(worldTangent, worldNormal) * worldNormal);
 	vec3 worldBitangent = GetWorldBitangent(worldNormal, orthogonalizedTangent);
-	return mat3(orthogonalizedTangent, worldBitangent, worldNormal);
+	return transpose(mat3(orthogonalizedTangent, worldBitangent, worldNormal));
 }
 #endif // End not geometry shader
 
@@ -290,6 +365,7 @@ void PropagateStdIO()
 {
     _L_stdio.position = position;
     _L_stdio.wvertex = GetWorldPosition();
+    _L_stdio.vertexcolor = vertexcolor;
     _L_stdio.normal = normal;
     _L_stdio.wnormal = GetWorldNormal();
     _L_stdio.tangent = tangent;
@@ -302,6 +378,7 @@ void PropagateStdIO(int index)
 {
     stdout(position) = stdin(index, position);
     stdout(wvertex) = stdin(index, wvertex);
+    stdout(vertexcolor) = stdin(index, vertexcolor);
     stdout(normal) = stdin(index, normal);
     stdout(wnormal) = stdin(index, wnormal);
     stdout(tangent) = stdin(index, tangent);

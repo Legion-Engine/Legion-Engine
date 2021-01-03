@@ -45,7 +45,8 @@ namespace legion::core::events
 
             if (m_eventCallbacks.contains(event_type::id))
             {
-                OPTICK_EVENT(typeName<event_type>());
+                OPTICK_EVENT("Event callbacks");
+                OPTICK_TAG("Event", typeName<event_type>());
                 force_value_cast<multicast_delegate<void(event_type*)>>(m_eventCallbacks[event_type::id]).invoke(eventptr); // Notify.
             }
         }
@@ -60,15 +61,8 @@ namespace legion::core::events
 
             if (m_eventCallbacks.contains(value->get_id()))
             {
-#if USE_OPTICK
-                static ::Optick::EventDescription* raiseEventDescription = nullptr;
-                if (raiseEventDescription == nullptr)
-                {
-                    async::readonly_guard guard(detail::eventNameLock);
-                    raiseEventDescription = ::Optick::CreateDescription(OPTICK_FUNC, __FILE__, __LINE__, detail::eventNames[value->get_id()].c_str());
-                }
-                ::Optick::Event raiseEventEvent(*(raiseEventDescription));
-#endif
+                OPTICK_EVENT("Event callbacks");
+                OPTICK_TAG("Event", detail::eventNames[value->get_id()].c_str());
                 m_eventCallbacks[value->get_id()].invoke(value.get());
             }
         }
@@ -84,15 +78,8 @@ namespace legion::core::events
 
             if (m_eventCallbacks.contains(id))
             {
-#if USE_OPTICK
-                static ::Optick::EventDescription* raiseEventUnsafeDescription = nullptr;
-                if (raiseEventUnsafeDescription == nullptr)
-                {
-                    async::readonly_guard guard(detail::eventNameLock);
-                    raiseEventUnsafeDescription = ::Optick::CreateDescription(OPTICK_FUNC, __FILE__, __LINE__, detail::eventNames[id].c_str());
-                }
-                ::Optick::Event raiseEventUnsafeEvent(*(raiseEventUnsafeDescription));
-#endif
+                OPTICK_EVENT("Event callbacks");
+                OPTICK_TAG("Event", detail::eventNames[value->get_id()].c_str());
                 m_eventCallbacks[id].invoke(value.get());
             }
         }

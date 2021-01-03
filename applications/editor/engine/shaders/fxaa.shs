@@ -1,0 +1,57 @@
+#version 450
+
+generate(vertex, fragment)
+
+#include<stdio.shinc>
+
+shader(vertex)
+{
+    void main(void)
+    {
+        gl_Position = vec4(stdin(position), 1.0);
+        PropagateStdIO();
+    }
+}
+
+shader(fragment)
+{
+    #include <color_correction.shinc>
+
+    uniform vec2 texelSize;
+    uniform float blurConstraint;
+    uniform float reductionScale;
+    uniform float reductionConstraint;
+
+    void main(void)
+    {
+        float topleft = Luminance(SceneColor(stdin(uv) + (vec2(-1.0, -1.0) * texelSize)));
+        float topright = Luminance(SceneColor(stdin(uv) + (vec2(1.0, -1.0) * texelSize)));
+        float bottomleft = Luminance(SceneColor(stdin(uv) + (vec2(-1.0, 1.0) * texelSize)));
+        float bottomright = Luminance(SceneColor(stdin(uv) + (vec2(1.0, 1.0) * texelSize)));
+
+        vec2 blurDir;
+        blurDir.x = -((topleft + topright) - (bottomleft + bottomright));
+        blurDir.y = (topleft + bottomleft) - (topright + bottomright);
+
+        float dirReduce = max((topleft + topright + bottomleft + bottomright) * (reductionScale * 0.25), reductionConstraint);
+
+        blurDir = clamp(blurDir * (1.0 / (min(abs(blurDir.x), abs(blurDir.y)) + dirReduce)), -blurConstraint.xx, blurConstraint.xx) * texelSize;
+
+        vec3 sample1 = mix(
+            SceneColor(stdin(uv) + (blurDir * -0.16666666)),
+            SceneColor(stdin(uv) + (blurDir * 0.166666666)), 0.5);
+        vec3 sample2 = mix(sample1, mix(
+            SceneColor(stdin(uv) + (blurDir * -0.5)),
+            SceneColor(stdin(uv) + (blurDir * 0.5)), 0.5), 0.5);
+
+        float center = Luminance(SceneColor(stdin(uv)));
+        float minLuminance = min(center, min(topleft, min(topright, min(bottomleft, bottomright))));
+        float maxLuminance = max(center, max(topleft, max(topright, max(bottomleft, bottomright))));
+        float sample2Luminance = Luminance(sample2);
+
+        if(sample2Luminance  < minLuminance || sample2Luminance > maxLuminance)
+            fragment_color = vec4(sample1, 1.0);
+        else
+            fragment_color = vec4(sample2, 1.0);
+    }
+}

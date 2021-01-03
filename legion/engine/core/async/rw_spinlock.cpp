@@ -10,7 +10,7 @@ namespace legion::core::async
     thread_local std::unordered_map<uint, int> rw_spinlock::m_localReaders;
     thread_local std::unordered_map<uint, lock_state> rw_spinlock::m_localState;
 
-    void rw_spinlock::read_lock()
+    void rw_spinlock::read_lock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -41,7 +41,7 @@ namespace legion::core::async
         m_localState[m_id] = lock_state::read; // Set thread_local state to read.
     }
 
-    bool rw_spinlock::read_try_lock()
+    bool rw_spinlock::read_try_lock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -67,7 +67,7 @@ namespace legion::core::async
         return true;
     }
 
-    void rw_spinlock::write_lock()
+    void rw_spinlock::write_lock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -101,7 +101,7 @@ namespace legion::core::async
         m_localState[m_id] = lock_state::write; // Set thread_local state to write.
     }
 
-    bool rw_spinlock::write_try_lock()
+    bool rw_spinlock::write_try_lock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -139,7 +139,7 @@ namespace legion::core::async
         return true;
     }
 
-    void rw_spinlock::read_unlock()
+    void rw_spinlock::read_unlock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -157,7 +157,7 @@ namespace legion::core::async
         m_localState[m_id] = lock_state::idle; // Set thread_local state to idle.
     }
 
-    void rw_spinlock::write_unlock()
+    void rw_spinlock::write_unlock() const
     {
         OPTICK_EVENT();
         if (m_forceRelease)
@@ -204,7 +204,7 @@ namespace legion::core::async
         return *this;
     }
 
-    void rw_spinlock::lock(lock_state permissionLevel)
+    void rw_spinlock::lock(lock_state permissionLevel) const
     {
         if (m_forceRelease)
             return;
@@ -220,7 +220,7 @@ namespace legion::core::async
         }
     }
 
-    bool rw_spinlock::try_lock(lock_state permissionLevel)
+    bool rw_spinlock::try_lock(lock_state permissionLevel) const
     {
         if (m_forceRelease)
             return true;
@@ -236,7 +236,7 @@ namespace legion::core::async
         }
     }
 
-    void rw_spinlock::unlock(lock_state permissionLevel)
+    void rw_spinlock::unlock(lock_state permissionLevel) const
     {
         if (m_forceRelease)
             return;
@@ -252,7 +252,7 @@ namespace legion::core::async
         }
     }
 
-    void rw_spinlock::lock_shared()
+    void rw_spinlock::lock_shared() const
     {
         if (m_forceRelease)
             return;
@@ -260,7 +260,7 @@ namespace legion::core::async
         return read_lock();
     }
 
-    bool rw_spinlock::try_lock_shared()
+    bool rw_spinlock::try_lock_shared() const
     {
         if (m_forceRelease)
             return true;
@@ -268,7 +268,7 @@ namespace legion::core::async
         return read_try_lock();
     }
 
-    void rw_spinlock::unlock_shared()
+    void rw_spinlock::unlock_shared() const
     {
         if (m_forceRelease)
             return;

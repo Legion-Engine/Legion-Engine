@@ -91,7 +91,7 @@ namespace legion::rendering
         for (auto& [_, effect] : m_effects)
         {
             OPTICK_EVENT("Rendering effect");
-            OPTICK_TAG("Effect name", effect->getName().c_str());
+            OPTICK_TAG("Effect", effect->getName().c_str());
 
             if (!effect->isInitialized()) effect->init(context);
             for (auto& pass : effect->renderPasses)

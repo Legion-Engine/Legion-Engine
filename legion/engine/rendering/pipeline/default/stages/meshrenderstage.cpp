@@ -64,7 +64,7 @@ namespace legion::rendering
         {
             OPTICK_EVENT("Rendering material");
             auto materialName = material.get_name();
-            OPTICK_TAG("Material name", materialName.c_str());
+            OPTICK_TAG("Material", materialName.c_str());
 
             camInput.bind(material);
             if (material.has_param<uint>(SV_LIGHTCOUNT))
@@ -76,7 +76,7 @@ namespace legion::rendering
             {
                 OPTICK_EVENT("Rendering instances");
                 auto modelName = ModelCache::get_model_name(modelHandle.id);
-                OPTICK_TAG("Model name", modelName.c_str());
+                OPTICK_TAG("Model", modelName.c_str());
 
                 if (!modelHandle.is_buffered())
                     modelHandle.buffer_data(*modelMatrixBuffer);

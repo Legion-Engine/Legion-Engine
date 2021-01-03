@@ -1,0 +1,29 @@
+#version 450
+
+generate(vertex, fragment)
+
+#include<stdio.shinc>
+
+shader(vertex)
+{
+    void main(void)
+    {
+        gl_Position = vec4(stdin(position), 1.0);
+        PropagateStdIO();
+    }
+}
+
+shader(fragment)
+{
+    #include <color_correction.shinc>
+
+    uniform float exposure;
+
+    void main(void)
+    {
+        vec3 premapped = SimpleReinhard(SceneColor(stdin(uv)));
+        vec3 exposureMapped = vec3(1.0) - exp(-premapped * exposure);
+
+        fragment_color = vec4(GammaCorrect(exposureMapped), 1.0);
+    }
+}

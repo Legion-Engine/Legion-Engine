@@ -1,10 +1,10 @@
 #version 450
+#state CULL BACK
 
 generate(fragment, vertex)
 
 #include <stdio.shinc>
 #include <lighting.shinc>
-#include <color_correction.shinc>
 
 shader(vertex)
 {
@@ -17,16 +17,38 @@ shader(vertex)
 
 shader(fragment)
 {
-    out vec4 fragment_color;
+    uniform bool discardExcess;
+    uniform vec4 skycolor;
 
     void main(void)
     {
         Camera camera = GetCamera();
+
         vec3 worldNormal = GetWorldNormal();
         Material material = ExtractMaterial(stdio(uv), camera, worldNormal, GetWorldTangent(worldNormal));
 
-        vec3 lighting = GetAllLighting(material, camera, GetWorldPosition(), worldNormal);
+        if(discardExcess)
+            if(material.texcoords.x < 0 || material.texcoords.x > 1 || material.texcoords.y < 0 || material.texcoords.y > 1)
+                discard;
 
-        fragment_color = vec4(GammaCorrect(lighting), material.albedo.a);
+        vec4 worldpos = WorldToScreenSpacePosition((worldNormal * material.height) + GetWorldPosition());
+        fragment_depth = worldpos.z / worldpos.w;
+
+        if(!DepthCull(fragment_depth))
+        {
+            vec3 lighting = GetAllLighting(material, camera, GetWorldPosition());
+
+            vec3 unitDir = reflect(-normalize(camera.toView), material.normal);
+            float reflectance = clamp01(0.01 + (pow(max(0.0, (1.0 - material.roughness)), 4) * 0.99));
+            vec3 reflection = mix(mix(vec3(length(skycolor.rgb)), skycolor.rgb, clamp01(dot(unitDir, vec3(0.f, 1.f, 0.f)) + 0.9)), (vec3(length(skycolor.rgb)) + skycolor.rgb)*0.5, material.roughness);
+
+            lighting += reflection * mix(vec3(1.0), material.albedo.rgb, material.metallic) * reflectance;
+
+            fragment_color = vec4(lighting, material.albedo.a);
+        }
+        else
+        {
+            fragment_color = vec4(1.0);
+        }
     }
 }

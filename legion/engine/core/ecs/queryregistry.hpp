@@ -24,11 +24,11 @@ namespace legion::core::ecs
         friend class EntityQuery;
     private:
         EcsRegistry& m_registry;
-        async::rw_spinlock m_entityLock;
+        mutable async::rw_spinlock m_entityLock;
         sparse_map<id_type, std::unique_ptr<entity_set>> m_entityLists;
-        async::rw_spinlock m_referenceLock;
+        mutable async::rw_spinlock m_referenceLock;
         sparse_map<id_type, size_type> m_references;
-        async::rw_spinlock m_componentLock;
+        mutable async::rw_spinlock m_componentLock;
         sparse_map<id_type, hashed_sparse_set<id_type>> m_componentTypes;
 
         id_type m_lastQueryId = 1;
@@ -139,7 +139,7 @@ namespace legion::core::ecs
          * @param queryId Id of the query to get the entities from.
          * @return sparse_map<id_type, entity_handle>& Sparse map with the ids as the key and the handles as the value.
          */
-        entity_set getEntities(id_type queryId);
+        entity_set getEntities(id_type queryId) const;
 
         /**@brief Add to reference count of a query.
          * @param queryId Id of query to increase reference count of.
