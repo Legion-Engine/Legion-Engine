@@ -30,7 +30,7 @@ namespace legion::physics
         math::vec3 refContactPoint;
         math::vec3 incContactPoint;
 
-        PhysicsStatics::FindClosestPointsToLineSegment(p1, p2, p3, p4, refContactPoint, incContactPoint);
+        PhysicsStatics::FindClosestPointsBetweenLineSegments(p1, p2, p3, p4, refContactPoint, incContactPoint);
 
         /*debug::user_projectdrawLine(p1, p2, math::colors::black, 5.0f, 20.0f);
         debug::user_projectdrawLine(p3, p4, math::colors::grey, 5.0f, 20.0f);

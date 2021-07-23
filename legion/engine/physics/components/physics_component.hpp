@@ -27,7 +27,8 @@ namespace legion::physics
          * ConvexCollider is then added to the list of PhysicsColliders
          * @param meshHandle - The mesh handle to lock the mesh and the mesh to create a hull from
         */
-		std::shared_ptr<ConvexCollider> ConstructConvexHull(legion::core::mesh_handle meshHandle,bool shouldDebug = false);
+		std::shared_ptr<ConvexCollider> ConstructConvexHull(legion::core::mesh_handle meshHandle,int DEBUG_stepMax = INT_MAX,
+            math::mat4 DEBUG_transform = math::mat4(1.0f));
 
         void ConstructConvexHull(legion::core::mesh_handle meshHandle, ConvexCollider& col);
 

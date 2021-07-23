@@ -2,9 +2,9 @@ name: build-action
 
 on:
   push:
-    branches: [main, develop, develop/*, develop* ]
+    branches: [main, develop, develop/*, develop*, feature/*, feature* ]
   pull_request:
-    branches: [main, develop, develop/*, develop* ]
+    branches: [main, develop, develop/*, develop*, feature/*, feature* ]
 
 jobs:
   build:
@@ -31,7 +31,7 @@ jobs:
       run: git log -p -2 || true
 
     - name: make
-      run: make CXX=clang++-9 config=debug64 all
+      run: make CXX=clang++-11 config=debug64 all
 
 
 

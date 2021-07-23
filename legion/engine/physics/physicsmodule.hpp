@@ -7,6 +7,7 @@
 #include <physics/mesh_splitter_utils/mesh_splitter.hpp>
 #include <physics/components/fracturer.hpp>
 #include <physics/components/fracturecountdown.hpp>
+#include <physics/systems/physics_fracture_test_system.hpp>
 
 namespace legion::physics
 {
@@ -25,6 +26,7 @@ namespace legion::physics
             reportComponentType<MeshSplitter>();
             reportComponentType<Fracturer>();
             reportComponentType<FractureCountdown>();
+            reportComponentType<ObjectToFollow>();
             //reportComponentType <addRB>();
         }
 

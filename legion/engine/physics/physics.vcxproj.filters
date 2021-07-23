@@ -39,9 +39,6 @@
     <ClCompile Include="data\edgepenetrationquery.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="systems\physicssystem.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="mesh_splitter_utils\primitive_mesh.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
@@ -63,7 +60,13 @@
     <ClCompile Include="broadphasecollisionalgorithms\broadphaseuniformgrid.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="broadphasecollisionalgorithms\broadphaseuniformgridnocaching.cpp">
+    <ClCompile Include="systems\physicssystem.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="halfedgeedge.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="data\collider_face_to_vert.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
@@ -201,6 +204,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="components\fracturecountdown.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="data\collider_face_to_vert.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

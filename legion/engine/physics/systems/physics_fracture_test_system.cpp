@@ -24,9 +24,10 @@ namespace legion::physics
         #pragma region Material Setup
    
         auto litShader = rendering::ShaderCache::create_shader("lit", fs::view("engine://shaders/default_lit.shs"));
-
+        vertexColor = rendering::MaterialCache::create_material("vertexColor", "assets://shaders/vertexcolor.shs"_view);
         textureH = rendering::MaterialCache::create_material("texture", "assets://shaders/texture.shs"_view);
         textureH.set_param("_texture", rendering::TextureCache::create_texture("assets://textures/split-test.png"_view));
+
         ///////////textureH
         //textureH = rendering::MaterialCache::create_material("texture", litShader);
         ////textureH.set_variant("double_sided");
@@ -88,7 +89,7 @@ namespace legion::physics
         tileH.set_param("roughnessTex", rendering::TextureCache::create_texture("assets://textures/tile/tileRoughness.png"_view));
         tileH.set_param("skycolor", math::color(0.1f, 0.3f, 1.0f));
 
-
+        wireFrameH = rendering::MaterialCache::create_material("wireframe", "assets://shaders/wireframe.shs"_view);
         #pragma endregion
 
         #pragma region Model Setup
@@ -97,6 +98,11 @@ namespace legion::physics
         planeH = rendering::ModelCache::create_model("plane", "assets://models/plane.obj"_view);
         cylinderH = rendering::ModelCache::create_model("cylinder", "assets://models/cylinder.obj"_view);
         concaveTestObject = rendering::ModelCache::create_model("concaveTestObject", "assets://models/polygonTest.obj"_view);
+        colaH = rendering::ModelCache::create_model("cola", "assets://models/cola.glb"_view);
+        hammerH = rendering::ModelCache::create_model("hammer", "assets://models/hammer.obj"_view);
+        suzzaneH = rendering::ModelCache::create_model("suzanne", "assets://models/suzanne.glb"_view);
+        teapotH = rendering::ModelCache::create_model("sah", "assets://models/gnomecentered.obj"_view);
+
         #pragma endregion
 
         #pragma region Input binding
@@ -105,6 +111,8 @@ namespace legion::physics
         app::InputSystem::createBinding<nextPhysicsTimeStepContinue>(app::inputmap::method::N);
         //app::InputSystem::createBinding<spawnEntity>(app::inputmap::method::MOUSE_LEFT);
         app::InputSystem::createBinding<explosion>(app::inputmap::method::B);
+        app::InputSystem::createBinding<QHULL>(app::inputmap::method::Q);
+        app::InputSystem::createBinding<AddRigidbody>(app::inputmap::method::R);
 
        /* app::InputSystem::createBinding<smallExplosion>(app::inputmap::method::NUM1);
         app::InputSystem::createBinding<mediumExplosion>(app::inputmap::method::NUM2);
@@ -127,7 +135,8 @@ namespace legion::physics
         bindToEvent<largeExplosion, &PhysicsFractureTestSystem::largeExplosionTest>();
 
         bindToEvent<explosion, &PhysicsFractureTestSystem::prematureExplosion>();
-
+        bindToEvent<QHULL, &PhysicsFractureTestSystem::quickHullStep>();
+        bindToEvent<AddRigidbody, &PhysicsFractureTestSystem::AddRigidbodyToQuickhulls>();
 
         #pragma endregion
 
@@ -136,6 +145,8 @@ namespace legion::physics
         //numericalRobustnessTest();
         //simpleMinecraftHouse();
         //explosionTest();
+        //fractureVideoScene();
+        quickhullTestScene();
         /*meshSplittingTest(planeH, cubeH
             , cylinderH, complexH, textureH);*/
 
@@ -151,9 +162,9 @@ namespace legion::physics
             sun.add_components<transform>(position(10, 10, 10), rotation::lookat(math::vec3(1, 1, -1), math::vec3::zero), scale());
         }
 
-        fractureVideoScene();
+        //fractureVideoScene();
 
-        createProcess<&PhysicsFractureTestSystem::colliderDraw>("Update");
+        createProcess<&PhysicsFractureTestSystem::colliderDraw>("Physics",0.02f);
         createProcess<&PhysicsFractureTestSystem::explodeAThing>("Physics");
 
         Fracturer::registry = m_ecs;
@@ -161,59 +172,22 @@ namespace legion::physics
 
     void PhysicsFractureTestSystem::colliderDraw(time::span dt)
     {
+        drawPhysicsColliders();
 
-        //static ecs::EntityQuery halfEdgeQuery = createQuery<physics::MeshSplitter,transform>();
-        //halfEdgeQuery.queryEntities();
+        auto query = createQuery<ObjectToFollow>();
+        query.queryEntities();
 
-        //for (auto entity : halfEdgeQuery)
-        //{
-        //    auto edgeFinderH = entity.get_component_handle<physics::MeshSplitter>();
-        //    auto edgeFinder = edgeFinderH.read();
-       
-        //    auto transH = entity.get_component_handles<transform>();
-        //    
-        //    auto [posH, rotH, scaleH] = entity.get_component_handles<transform>();
-        //    const math::mat4 transform = math::compose(scaleH.read(), rotH.read(), posH.read());
+        for (auto ent : query)
+        {
+            auto objToFollow = ent.read_component<ObjectToFollow>();
 
-        //    for (auto pol : edgeFinder.meshPolygons)
-        //    {
-        //        const math::vec3& worldCentroid = transform * math::vec4(pol->localCentroid, 1);
-        //        const math::vec3& worldNormal = transform * math::vec4(pol->localNormal, 0);
+            auto [posH,rotH,scaleH] = ent.get_component_handles<transform>();
+            auto [posH2, rotH2, scaleH2] = objToFollow.ent.get_component_handles<transform>();
 
-        //        for (auto edge : pol->GetMeshEdges())
-        //        {
-        //            if (edge->isBoundary)
-        //            {
-        //                auto [start, end] = edge->getEdgeWorldPositions(transform);
-        //                auto startOffset = (worldCentroid - start) * 0.1f + worldNormal * 0.01f;
-        //                auto endOffset = (worldCentroid - end) * 0.1f + worldNormal * 0.01f;
-        //                
-        //                debug::user_projectDrawLine(start + startOffset, end + endOffset, pol->debugColor, 5.0f);
-        //            }
-        //            
-        //        }
-        //    }
-
-        //   
-
-        //    for (auto pol : edgeFinder.meshPolygons)
-        //    {
-        //        int boundaryCount = pol->CountBoundary();
-
-
-        //        if (boundaryCount == 16)
-        //        {
-        //            math::vec3 worldCentroid = transform * math::vec4(pol->localCentroid, 1);
-
-        //            //
-        //            debug::user_projectDrawLine(worldCentroid, worldCentroid  + math::vec3(0, 0.1, 0), math::colors::red, 5.0f, 30.0f);
-        //        }
-
-        //        //log::debug(" polygon had {} boundary edges ", boundaryCount);
-        //    }
-
-        //}
-
+            posH.write(posH2.read());
+            rotH.write(rotH2.read());
+            scaleH.write(scaleH2.read());
+        }
 
     }
 
@@ -685,9 +659,6 @@ namespace legion::physics
 
             physics::physicsComponent physicsComponent2;
             
-
-
-
             physicsComponent2.AddBox(staticBlockParams);
             physicsComponent2.isTrigger = false;
             entPhyHande.write(physicsComponent2);
@@ -712,8 +683,6 @@ namespace legion::physics
 
             physics::physicsComponent physicsComponent2;
             
-
-
             physicsComponent2.AddBox(cubeParams);
             entPhyHande.write(physicsComponent2);
 
@@ -808,6 +777,360 @@ namespace legion::physics
        
     }
 
+    void PhysicsFractureTestSystem::quickhullTestScene()
+    {
+        math::mat3 elongatedBlockInertia = math::mat3(math::vec3(6.0f, 0, 0), math::vec3(0.0f, 18.0f, 0), math::vec3(0, 0, 6.0f));
+
+        //cube
+        createQuickhullTestObject
+        (math::vec3(0,5.0f, -0.8f),cubeH, concreteH);
+
+        //cup
+        createQuickhullTestObject
+        (math::vec3(5.0f, 5.0f, -0.8f), colaH, wireFrameH, elongatedBlockInertia);
+
+        //////hammer
+        createQuickhullTestObject
+        (math::vec3(10.0f, 5.0f, -0.8f), hammerH, rockTextureH);
+
+        ////suzanne
+        createQuickhullTestObject
+        (math::vec3(15.0f, 5.0f, -0.8f), suzzaneH, wireFrameH);
+
+        ////ohio teapot
+        createQuickhullTestObject
+        (math::vec3(20.0f, 5.0f, -0.5f), teapotH, wireFrameH,elongatedBlockInertia);
+        
+
+        addStaircase(math::vec3(8, 2, 0));
+        addStaircase(math::vec3(8, 1, -1));
+        addStaircase(math::vec3(8, 0, -2));
+        addStaircase(math::vec3(8, -1, -3.1f));
+
+        addStaircase(math::vec3(8, -2, -5),5.0f);
+
+
+        for (size_t i = 0; i < registeredColliderColorDraw.size(); i++)
+        {
+            folowerObjects.push_back(std::vector<ecs::entity_handle>());
+        }
+    }
+
+    void PhysicsFractureTestSystem::addStaircase(math::vec3 position, float breadthMult)
+    {
+        physics::cube_collider_params cubeParams;
+        cubeParams.breadth = breadthMult;
+        cubeParams.width = 27.0f;
+        cubeParams.height = 1.0f;
+
+        auto ent = m_ecs->createEntity();
+
+        auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(ent);
+        positionH.write(position);
+
+        //ent.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(textureH));
+
+        auto entPhyHande = ent.add_component<physics::physicsComponent>();
+        physics::physicsComponent physicsComponent2;
+        physicsComponent2.AddBox(cubeParams);
+        entPhyHande.write(physicsComponent2);
+
+        auto ent2 = m_ecs->createEntity();
+        ent2.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(textureH));
+
+        auto [position2H, rotation2H, scale2H] = m_ecs->createComponents<transform>(ent2);
+        position2H.write(position);
+        scale2H.write(math::vec3(cubeParams.width, 1.0f, breadthMult));
+    }
+
+    void PhysicsFractureTestSystem::createQuickhullTestObject(math::vec3 position, rendering::model_handle cubeH, rendering::material_handle TextureH, math::mat3 inertia )
+    {
+        physics::cube_collider_params cubeParams;
+        cubeParams.breadth = 1.0f;
+        cubeParams.width = 1.0f;
+        cubeParams.height = 1.0f;
+
+        auto ent = m_ecs->createEntity();
+
+        auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(ent);
+        positionH.write(position);
+
+        ent.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(TextureH));
+
+        auto entPhyHande = ent.add_component<physics::physicsComponent>();
+
+        auto rbH = ent.add_component<rigidbody>();
+        auto rb = rbH.read();
+        rb.localInverseInertiaTensor = inertia;
+        rbH.write(rb);
+
+        registeredColliderColorDraw.push_back(ent);
+    }
+
+    void PhysicsFractureTestSystem::PopulateFollowerList(ecs::entity_handle physicsEnt, int index)
+    {
+        app::window window = m_ecs->world.get_component_handle<app::window>().read();
+
+        auto physicsComp = physicsEnt.read_component<physicsComponent>();
+        auto collider = std::dynamic_pointer_cast<ConvexCollider>(physicsComp.colliders.at(0));
+        auto [posH, rotH, scaleH] = physicsEnt.get_component_handles<transform>();
+
+        auto& currentContainer = folowerObjects.at(index);
+
+        for (auto ent : currentContainer)
+        {
+            m_ecs->destroyEntity(ent);
+        }
+
+        folowerObjects.at(index).clear();
+
+        for (auto face : collider->GetHalfEdgeFaces())
+        {
+            //populate localVert
+            math::vec3 localCentroid = face->centroid;
+            std::vector<math::vec3> localVert;
+
+            auto populateVectorLambda = [&localVert](physics::HalfEdgeEdge* edge)
+            {
+                localVert.push_back(edge->edgePosition);
+            };
+
+            face->forEachEdge(populateVectorLambda);
+
+            //initialize mesh
+            legion::core::mesh newMesh;
+
+            std::vector<math::vec3> vertices;
+            std::vector<uint> indices;
+            std::vector<math::vec3> normals;
+            std::vector<math::vec2> uvs;
+
+            for (size_t i = 0; i < localVert.size(); i++)
+            {
+                vertices.push_back(localVert.at(i));
+                vertices.push_back(localVert.at((i + 1) % localVert.size()));
+                vertices.push_back(localCentroid);
+            }
+
+            for (size_t i = 0; i < localVert.size(); i++)
+            {
+                normals.push_back(math::vec3(face->normal));
+            }
+
+            for (size_t i = 0; i < vertices.size(); i++)
+            {
+                indices.push_back(i);
+            }
+
+            for (size_t i = 0; i < vertices.size(); i++)
+            {
+                uvs.push_back(math::vec2());
+            }
+
+
+            newMesh.vertices = vertices;
+            newMesh.indices = indices;
+            newMesh.uvs = uvs;
+            newMesh.normals = normals;
+
+            newMesh.calculate_tangents(&newMesh);
+
+            sub_mesh newSubMesh;
+            newSubMesh.indexCount = newMesh.indices.size();
+            newSubMesh.indexOffset = 0;
+
+            newMesh.submeshes.push_back(newSubMesh);
+
+            //creaate modelH
+            static int count = 0;
+            mesh_handle meshH = core::MeshCache::create_mesh("newMesh" + std::to_string(count), newMesh);
+            auto modelH = rendering::ModelCache::create_model(meshH);
+
+
+            auto newEnt = m_ecs->createEntity();
+
+            rendering::material_handle newMat;
+            {
+                app::context_guard guard(window);
+                auto colorShader = rendering::ShaderCache::create_shader("color" + std::to_string(count), fs::view("assets://shaders/color.shs"));
+                newMat = rendering::MaterialCache::create_material("vertex color" + std::to_string(count), colorShader);
+                newMat.set_param("color", math::color(math::linearRand(0.25f, 0.7f), math::linearRand(0.25f, 0.7f), math::linearRand(0.25f, 0.7f)));
+            }
+
+            mesh_filter meshFilter = mesh_filter(meshH);
+            //mesh_filter(cubeH.get_mesh()),
+            newEnt.add_components<rendering::mesh_renderable>(meshFilter, rendering::mesh_renderer(newMat));
+
+            
+            auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(newEnt);
+            positionH.write(posH.read());
+            count++;
+
+            ObjectToFollow followObj;
+            followObj.ent = physicsEnt;
+            newEnt.add_component(followObj);
+
+            //newEnt.set_parent(physicsEnt);
+            currentContainer.push_back(newEnt);
+
+        }
+
+
+      
+    }
+
+
+
+    void PhysicsFractureTestSystem::drawPhysicsColliders()
+    {
+        static float offset = 0.005f;
+        static auto physicsQuery = createQuery< physics::physicsComponent>();
+        physicsQuery.queryEntities();
+
+        for (auto entity : physicsQuery)
+        {
+            auto rotationHandle = entity.get_component_handle<rotation>();
+            auto positionHandle = entity.get_component_handle<position>();
+            auto scaleHandle = entity.get_component_handle<scale>();
+            auto physicsComponentHandle = entity.get_component_handle<physics::physicsComponent>();
+
+            bool hasTransform = rotationHandle && positionHandle && scaleHandle;
+            bool hasNecessaryComponentsForPhysicsManifold = hasTransform && physicsComponentHandle;
+
+            if (hasNecessaryComponentsForPhysicsManifold)
+            {
+                auto rbColor = math::color(0.0, 0.5, 0, 1);
+                auto statibBlockColor = math::color(0, 1, 0, 1);
+
+                rotation rot = rotationHandle.read();
+                position pos = positionHandle.read();
+                scale scale = scaleHandle.read();
+
+                auto usedColor = rbColor;
+                bool useDepth = false;
+
+                if (entity.get_component_handle<physics::rigidbody>())
+                {
+                    usedColor = rbColor;
+                    //useDepth = true;
+                }
+
+
+                //assemble the local transform matrix of the entity
+                math::mat4 localTransform;
+                math::compose(localTransform, scale, rot, pos);
+
+                auto physicsComponent = physicsComponentHandle.read();
+
+                for (auto physCollider : physicsComponent.colliders)
+                {
+                    
+                    //--------------------------------- Draw Collider Outlines ---------------------------------------------//
+                    if (!physCollider->shouldBeDrawn) { continue; }
+                    //math::vec3 colliderCentroid = pos + math::vec3(localTransform * math::vec4(physCollider->GetLocalCentroid(), 0));
+                    //debug::drawLine(colliderCentroid, colliderCentroid + math::vec3(0.0f,0.2f,0.0f), math::colors::cyan, 6.0f,0.0f,true);
+
+                    for (auto face : physCollider->GetHalfEdgeFaces())
+                    {
+
+                        //face->forEachEdge(drawFunc);
+                        physics::HalfEdgeEdge* initialEdge = face->startEdge;
+                        physics::HalfEdgeEdge* currentEdge = face->startEdge;
+                        math::vec3 worldNormal = (localTransform * math::vec4(face->normal, 0));
+                        math::vec3 faceStart = localTransform * math::vec4(face->centroid, 1);
+                        math::vec3 faceEnd = faceStart + worldNormal * 0.1f;
+
+                        //debug::drawLine(faceStart, faceEnd, math::colors::green, 2.0f);
+
+                        if (!currentEdge) { return; }
+
+                        do
+                        {
+                            physics::HalfEdgeEdge* edgeToExecuteOn = currentEdge;
+                            currentEdge = currentEdge->nextEdge;
+                            math::vec3 shift = worldNormal * offset;
+
+                            math::vec3 worldStart = (localTransform * math::vec4(edgeToExecuteOn->edgePosition, 1)) ;
+                            math::vec3 worldEnd = (localTransform * math::vec4(edgeToExecuteOn->nextEdge->edgePosition, 1)) ;
+
+                            //debug::drawLine(worldStart + shift, worldEnd + shift, usedColor, 2.0f, 0.0f, useDepth);
+
+                            if (auto pairing = edgeToExecuteOn->pairingEdge)
+                            {
+                                //math::vec3 currentEdgeConnect = worldStart + shift + (worldEnd - worldStart + shift * 2.0f) * 0.25;
+                                //math::vec3 currentMeet = worldStart + (worldEnd - worldStart) * 0.25;
+                                ////debug::drawLine(currentEdgeConnect, currentMeet, math::colors::red, 5.0f, 0.0f, useDepth);
+
+                                // math::vec3 pairingWorldStart = (localTransform * math::vec4(pairing->edgePosition, 1));
+                                //math::vec3 pairinWorldEnd = (localTransform * math::vec4(pairing->nextEdge->edgePosition, 1));
+
+                                //math::vec3 pairingMeet = pairingWorldStart + (pairinWorldEnd - pairingWorldStart) * 0.25;
+                                //math::vec3 pairingEdgeConnect = pairingWorldStart + shift +
+                                //    (pairinWorldEnd - pairingWorldStart + shift * 2.0f) * 0.25;
+
+                                //debug::drawLine(pairingEdgeConnect, pairingMeet, math::colors::red, 5.0f, 0.0f, useDepth);
+                            }
+
+                        } while (initialEdge != currentEdge && currentEdge != nullptr);
+                    }
+                }
+
+            }
+        }
+    }
+
+    int step = 0;
+    int maxStep = 0;
+
+    void PhysicsFractureTestSystem::quickHullStep(QHULL * action)
+    {
+        if (!action->value)
+        {
+            int i = 0;
+            for (auto ent : registeredColliderColorDraw)
+            {
+                //[1] Get transform
+                auto [posH,rotH,scaleH] = ent.get_component_handles<transform>();
+
+                math::mat4 transform = math::compose(scaleH.read(), rotH.read(), posH.read());
+
+                //auto 
+                auto meshFilter = ent.read_component<mesh_filter>();
+
+                //[1] clear colliders list
+                auto physicsComponentH = ent.get_component_handle<physics::physicsComponent>();
+                auto physComp = physicsComponentH.read();
+                physComp.colliders.clear();
+                physComp.ConstructConvexHull(meshFilter, step, transform);
+                physicsComponentH.write(physComp);
+
+                //[4] use collider to generate follower objects
+                PopulateFollowerList(ent,i);
+                i++;
+            }
+
+            step++;
+            log::debug("PhysicsFractureTestSystem::quickHullStep");
+        }
+
+    
+      
+    }
+
+    void PhysicsFractureTestSystem::AddRigidbodyToQuickhulls(AddRigidbody* action)
+    {
+        if (!action->value)
+        {
+            log::debug("Add body");
+            for (auto ent : registeredColliderColorDraw)
+            {
+                ent.add_component<rigidbody>();
+            }
+        }
+
+
+    }
+
     void PhysicsFractureTestSystem::extendedContinuePhysics(extendedPhysicsContinue * action)
     {
         if (action->value)
@@ -868,8 +1191,6 @@ namespace legion::physics
             log::debug(" onNextPhysicsTimeStepRequest");
         }
     }
-
-    
 
     void PhysicsFractureTestSystem::compositeColliderTest()
     {

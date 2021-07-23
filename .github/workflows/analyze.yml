@@ -1,7 +1,7 @@
 name: analyze-action
 on:
   pull_request:
-    branches: [main, develop, develop/*, develop* ]
+    branches: [main, develop, develop/*, develop*, feature/*, feature* ]
 
 jobs:
   analyze:
@@ -28,10 +28,13 @@ jobs:
       run: |
        premake5 --file=premake5.lua gmake && \
        premake5 --file=premake5.lua vs2019
+    
+    - name: build legion dependencies
+      run: make CXX=clang++-11 config=debug64 legion-core  
 
     - name: intercept-build & analyze-build
       run: |
-       /home/runner/.local/bin/intercept-build make --dry-run CXX=clang++-9 config=debug64 all && \
+       /home/runner/.local/bin/intercept-build make --dry-run CXX=clang++-11 config=debug64 all && \
        /home/runner/.local/bin/analyze-build --status-bugs
 
     - name: cppcheck

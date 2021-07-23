@@ -11,47 +11,41 @@ namespace legion::physics
 {
     void ConvexCollider::CheckCollisionWith(ConvexCollider* convexCollider, physics_manifold& manifold) 
     {
-        bool shouldDebug = manifold.DEBUG_checkID("cube","floor");
         OPTICK_EVENT();
+
         // Middle-phase collision detection
         // Do AABB collision to check whether collision is possible
         auto aabbThis = this->GetMinMaxWorldAABB();
         auto aabbOther = convexCollider->GetMinMaxWorldAABB();
         auto& [low0, high0] = aabbThis;
         auto& [low1, high1] = aabbOther;
+       
         if (!physics::PhysicsStatics::CollideAABB(low0, high0, low1, high1))
         {
+
             manifold.isColliding = false;
             return;
         }
 
-        //auto compIDA = manifold.entityA.get_component_handle<identifier>();
-        //auto compIDB = manifold.entityB.get_component_handle<identifier>();
-
         //--------------------- Check for a collision by going through the edges and faces of both polyhedrons  --------------//
         //'this' is colliderB and 'convexCollider' is colliderA
         
-
-        ////log::debug("-------------------- SAT CHECK -----------------");
         PointerEncapsulator < HalfEdgeFace> ARefFace;
 
-        ////log::debug("Face Check A");
         float ARefSeperation;
         if (PhysicsStatics::FindSeperatingAxisByExtremePointProjection(
             this, convexCollider, manifold.transformB,manifold.transformA,  ARefFace, ARefSeperation) || !ARefFace.ptr)
         {
-            //log::debug("Not Found on A ");
             manifold.isColliding = false;
             return;
         }
 
         PointerEncapsulator < HalfEdgeFace> BRefFace;
-        //log::debug("Face Check B");
+
         float BRefSeperation;
         if (PhysicsStatics::FindSeperatingAxisByExtremePointProjection(convexCollider,
-            this, manifold.transformA, manifold.transformB, BRefFace, BRefSeperation, shouldDebug) || !BRefFace.ptr)
+            this, manifold.transformA, manifold.transformB, BRefFace, BRefSeperation) || !BRefFace.ptr)
         {
-            //log::debug("Not Found on B ");
             manifold.isColliding = false;
             return;
         }
@@ -61,40 +55,14 @@ namespace legion::physics
 
         math::vec3 edgeNormal;
         float aToBEdgeSeperation;
-        //log::debug("Edge Check");
-        if (PhysicsStatics::FindSeperatingAxisByGaussMapEdgeCheck(this, convexCollider, manifold.transformB, manifold.transformA,
-            edgeRef, edgeInc, edgeNormal, aToBEdgeSeperation, shouldDebug) || !edgeRef.ptr)
+
+        if (PhysicsStatics::FindSeperatingAxisByGaussMapEdgeCheck( this, convexCollider, manifold.transformB, manifold.transformA,
+            edgeRef, edgeInc, edgeNormal, aToBEdgeSeperation,true ) || !edgeRef.ptr )
         {
-            //
             manifold.isColliding = false;
-
-            if (shouldDebug)
-            {
-                edgeRef.ptr->DEBUG_drawEdge(manifold.transformB, math::colors::blue, 10.0f);
-                edgeInc.ptr->DEBUG_drawEdge(manifold.transformA, math::colors::red, 10.0f);
-            }
             return;
         }
 
-        if (shouldDebug)
-        {
-            log::debug("-> collision detected for debug ");
-            ARefFace.ptr->DEBUG_DrawFace(manifold.transformA, math::colors::blue, 5.0f);
-            BRefFace.ptr->DEBUG_DrawFace(manifold.transformB, math::colors::red, 5.0f);
-        }
-
-      
-       /* ConvexConvexCollisionInfo convexCollisionInfo;
-       
-        PhysicsStatics::DetectConvexConvexCollision(this,convexCollider, 
-            manifold.transformA, manifold.transformB, convexCollisionInfo, manifold);*/
-
-        /*if (!manifold.isColliding)
-        {
-            return;
-        }*/
-  
-    
         //--------------------- A Collision has been found, find the most shallow penetration  ------------------------------------//
 
         //TODO all penetration querys should supply a constructor that takes in a  ConvexConvexCollisionInfo
@@ -105,7 +73,6 @@ namespace legion::physics
         math::vec3 worldFaceCentroidB = manifold.transformB * math::vec4(BRefFace.ptr->centroid, 1);
         math::vec3 worldFaceNormalB = manifold.transformB * math::vec4(BRefFace.ptr->normal, 0);
 
-    
         math::vec3 worldEdgeAPosition = edgeRef.ptr? manifold.transformB * math::vec4(edgeRef.ptr->edgePosition, 1) : math::vec3();
         math::vec3 worldEdgeNormal = edgeNormal;
 
@@ -140,47 +107,7 @@ namespace legion::physics
             manifold.penetrationInformation = std::move(abEdgePenetrationQuery);
         }
 
-        if (shouldDebug)
-        {
-            //log::debug("manifold.penetrationInformation chosen {} ", manifold.penetrationInformation->debugID);
-        }
         manifold.isColliding = true;
-
-        //keeping this here so i can copy pasta when i need it again
-        //log::debug("---- PENETRATION INFO");
-
-        //log::debug("---- abPenetrationQuery {}",abPenetrationQuery->penetration);
-        //log::debug("---- baPenetrationQuery {}",baPenetrationQuery->penetration);
-        //log::debug("---- abEdgePenetrationQuery {}", abEdgePenetrationQuery->penetration);
-        //log::debug("---- chosen penetration {}", manifold.penetrationInformation->penetration);
-
-        //log::debug("Collision FOUND between {} and {}!" , compIDA.read().id, compIDB.read().id);
-
-        //physics::PhysicsSystem::penetrationQueries.push_back(manifold.penetrationInformation);
-
-        //convexCollisionInfo
-        //math::vec3 worldFaceCentroidA = manifold.transformA * math::vec4(convexCollisionInfo.ARefFace.ptr->centroid, 1);
-        //math::vec3 worldFaceNormalA = manifold.transformA * math::vec4(convexCollisionInfo.ARefFace.ptr->normal, 0);
-
-        //math::vec3 worldFaceCentroidB = manifold.transformB * math::vec4(convexCollisionInfo.BRefFace.ptr->centroid, 1);
-        //math::vec3 worldFaceNormalB = manifold.transformB * math::vec4(convexCollisionInfo.BRefFace.ptr->normal, 0);
-
-
-        //math::vec3 worldEdgeAPosition = convexCollisionInfo.edgeRef.ptr ? manifold.transformB * math::vec4(convexCollisionInfo.edgeRef.ptr->edgePosition, 1) : math::vec3();
-        //math::vec3 worldEdgeNormal = convexCollisionInfo.edgeNormal;
-
-        //auto abPenetrationQuery =
-        //    std::make_shared< ConvexConvexPenetrationQuery>(convexCollisionInfo.ARefFace.ptr
-        //        , convexCollisionInfo.BRefFace.ptr, worldFaceCentroidA, worldFaceNormalA, convexCollisionInfo.ARefSeperation, true);
-
-        //auto baPenetrationQuery =
-        //    std::make_shared < ConvexConvexPenetrationQuery>(convexCollisionInfo.BRefFace.ptr, convexCollisionInfo.ARefFace.ptr,
-        //        worldFaceCentroidB, worldFaceNormalB, convexCollisionInfo.BRefSeperation, false);
-
-        //auto abEdgePenetrationQuery =
-        //    std::make_shared < EdgePenetrationQuery>(convexCollisionInfo.edgeRef.ptr, convexCollisionInfo.edgeInc.ptr, worldEdgeAPosition, worldEdgeNormal,
-        //        convexCollisionInfo.aToBEdgeSeperation, false);
-   
     }
 
     void ConvexCollider::PopulateContactPointsWith(ConvexCollider* convexCollider, physics_manifold& manifold)
@@ -264,6 +191,12 @@ namespace legion::physics
 
 
     }
+
+  /*  void ConvexCollider::ConstructConvexHullWithMesh(legion::core::mesh_handle meshHandle, math::mat4 DEBUG_transform)
+    {
+        meshHandle.
+        return PhysicsStatics::generateConvexHull()
+    }*/
 
     void ConvexCollider::ConstructConvexHullWithMesh(mesh& mesh, math::vec3 spacingAmount,bool shouldDebug)
     {
@@ -685,7 +618,29 @@ namespace legion::physics
         AssertEdgeValidity();
         //log::debug("-> Finish ConstructConvexHullWithMesh ----------------------------------");
     }
-    
+
+    void ConvexCollider::PopulateVertexListWithHalfEdges()
+    {
+        auto& verticesVec = vertices;
+
+        int reserveSize = halfEdgeFaces.size() * 3;
+
+        verticesVec.reserve(reserveSize);
+
+
+        auto collectVertices = [&verticesVec](HalfEdgeEdge* edge)
+        {
+            edge->calculateRobustEdgeDirection();
+            verticesVec.push_back(edge->edgePosition -= PhysicsStatics::PointDistanceToPlane(edge->face->normal, edge->face->centroid, edge->edgePosition));
+        };
+
+        for (auto face : halfEdgeFaces)
+        {
+            face->forEachEdge(collectVertices);
+        }
+
+
+    }
 
     void ConvexCollider::convexHullConstructHorizon(math::vec3 vert, HalfEdgeFace& face, std::deque<HalfEdgeEdge*>& edges, HalfEdgeEdge* originEdge,
         std::shared_ptr<std::unordered_set<HalfEdgeFace*>> visited)

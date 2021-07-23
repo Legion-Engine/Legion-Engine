@@ -16,7 +16,6 @@ namespace legion::physics
     void ConvexConvexPenetrationQuery::populateContactList(physics_manifold& manifold, math::mat4& refTransform
         , math::mat4 incTransform, PhysicsCollider* refCollider)
     {
-        
         auto incCollider = isARef ? manifold.colliderB : manifold.colliderA;
         float largestDotResult = std::numeric_limits<float>::lowest();
 
@@ -25,7 +24,6 @@ namespace legion::physics
         for (auto face : incCollider->GetHalfEdgeFaces())
         {
             math::vec3 worldFaceNormal = incTransform * math::vec4(face->normal, 0);
-
             float currentDotResult = math::dot(-normal, worldFaceNormal);
             if (currentDotResult > largestDotResult)
             {
@@ -33,7 +31,7 @@ namespace legion::physics
                 incFace = face;
             }
         }
-
+ 
         //------------------------------- get all world vertex positions in incFace -------------------------------------------------//
         std::vector<ContactVertex> outputContactPoints;
 
@@ -48,8 +46,6 @@ namespace legion::physics
         };
 
         incFace->forEachEdge(sendToInitialOutput);
-
-
 
         //------------------------------- clip vertices with faces that are the neighbors of refFace  ---------------------------------//
         auto clipNeigboringFaceWithOutput = [&refTransform,&outputContactPoints](HalfEdgeEdge* edge)
@@ -68,11 +64,10 @@ namespace legion::physics
 
         refFace->forEachEdge(clipNeigboringFaceWithOutput);
 
-
         for (const auto& incidentContact : outputContactPoints)
         {
             float distanceToCollisionPlane = PhysicsStatics::PointDistanceToPlane(normal, faceCentroid, incidentContact.position);
-
+            
             if (distanceToCollisionPlane < constants::contactOffset)
             {
                 math::vec3 referenceContact = incidentContact.position - normal * distanceToCollisionPlane;
@@ -86,10 +81,7 @@ namespace legion::physics
                 refCollider->AttemptFindAndCopyConverganceID(contact);
 
                 manifold.contacts.push_back(contact);
-             
             }
         }
     }
-
-
 }

@@ -30,7 +30,7 @@ namespace legion::rendering
         m_bokehSize = 4.0f;
 
         // Adding itself to the post processing renderpass.
-        addRenderPass<&DepthOfField::renderPass>();
+        //addRenderPass<&DepthOfField::renderPass>();
     }
     void DepthOfField::renderPass(framebuffer& fbo, RenderPipelineBase* pipeline, camera& cam, const camera::camera_input& camInput, time::span deltaTime)
     {

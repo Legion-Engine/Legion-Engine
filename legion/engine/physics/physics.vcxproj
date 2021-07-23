@@ -15,8 +15,10 @@
     <ClCompile Include="broadphasecollisionalgorithms\broadphaseuniformgridnocaching.cpp" />
     <ClCompile Include="colliders\convexcollider.cpp" />
     <ClCompile Include="components\fracturer.cpp" />
+    <ClCompile Include="data\collider_face_to_vert.cpp" />
     <ClCompile Include="data\convexconvexpenetrationquery.cpp" />
     <ClCompile Include="data\edgepenetrationquery.cpp" />
+    <ClCompile Include="halfedgeedge.cpp" />
     <ClCompile Include="halfedgeface.cpp" />
     <ClCompile Include="components\physics_component.cpp" />
     <ClCompile Include="mesh_splitter_utils\mesh_splitter.cpp" />
@@ -52,6 +54,7 @@
     <ClInclude Include="data\physics_manifold_precursor.hpp" />
     <ClInclude Include="data\edgepenetrationquery.h" />
     <ClInclude Include="data\pointer_encapsulator.hpp" />
+    <ClInclude Include="data\collider_face_to_vert.hpp" />
     <ClInclude Include="data\VoronoiAABB.hpp" />
     <ClInclude Include="events\events.hpp" />
     <ClInclude Include="halfedgeedge.hpp" />

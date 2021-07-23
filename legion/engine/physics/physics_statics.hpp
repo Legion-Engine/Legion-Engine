@@ -6,6 +6,7 @@
 #include <Voro++/voro++.hh>
 #include <rendering/debugrendering.hpp>
 #include <physics/data/convex_convex_collision_info.hpp>
+#include <physics/data/collider_face_to_vert.hpp>
 
 namespace legion::physics
 {
@@ -20,12 +21,12 @@ namespace legion::physics
 
         //---------------------------------------------------------------- Collision Detection ----------------------------------------------------------------------------//
 
-        /** @brief Given 2 ConvexCollider and their respective transforms, checks if 
-        * the colliders are colliding. The result is recorded in the physics_manifold
-        */
-        static void DetectConvexConvexCollision(ConvexCollider* convexA, ConvexCollider* convexB
-            , const math::mat4& transformA, const math::mat4& transformB,
-            ConvexConvexCollisionInfo& outCollisionInfo,  physics_manifold& manifold);
+        ///** @brief Given 2 ConvexCollider and their respective transforms, checks if 
+        //* the colliders are colliding. The result is recorded in the physics_manifold
+        //*/
+        //static void DetectConvexConvexCollision(ConvexCollider* convexA, ConvexCollider* convexB
+        //    , const math::mat4& transformA, const math::mat4& transformB,
+        //    ConvexConvexCollisionInfo& outCollisionInfo,  physics_manifold& manifold);
 
         /** @brief Given a transformed ConvexCollider and a direction, Gets the vertex furthest in the given direction
          * @param planePosition The position of the support plane in world space
@@ -36,7 +37,7 @@ namespace legion::physics
          * @return returns true if a seperating axis was found
          */
         static void GetSupportPoint(const math::vec3& planePosition, const math::vec3& direction, ConvexCollider* collider, const math::mat4& colliderTransform
-            , math::vec3& worldSupportPoint)
+            , math::vec3& worldSupportPoint) 
         {
             float largestDistanceInDirection = std::numeric_limits<float>::lowest();
 
@@ -63,28 +64,9 @@ namespace legion::physics
         * @param worldSupportPoint [out] the resulting support point
         * @return returns true if a seperating axis was found
         */
-        static void GetSupportPointNoTransform( math::vec3 planePosition,  math::vec3 direction, ConvexCollider* collider, const math::mat4& colliderTransform
-            , math::vec3& worldSupportPoint)
-        {
-            float largestDistanceInDirection = std::numeric_limits<float>::lowest();
-            planePosition = math::inverse(colliderTransform) * math::vec4(planePosition, 1);
-            direction = math::inverse(colliderTransform) * math::vec4(direction, 0);
-
-            for (const auto& vert : collider->GetVertices())
-            {
-                math::vec3 transformedVert = math::vec4(vert, 1);
-
-                float dotResult = math::dot(transformedVert - planePosition, direction);
-
-                if (dotResult > largestDistanceInDirection)
-                {
-                    largestDistanceInDirection = dotResult;
-                    worldSupportPoint = transformedVert;
-                }
-            }
-
-            worldSupportPoint = colliderTransform * math::vec4(worldSupportPoint, 1);
-        }
+        static void GetSupportPointNoTransform(math::vec3 planePosition, math::vec3 direction, ConvexCollider* collider, const math::mat4& colliderTransform
+            , math::vec3& worldSupportPoint);
+       
 
 
         /** @brief Given a std::vector of vertices, gets the support point in the given direction
@@ -102,46 +84,10 @@ namespace legion::physics
          * @return returns true if a seperating axis was found
          */
         static bool FindSeperatingAxisByExtremePointProjection(ConvexCollider* convexA
-            , ConvexCollider* convexB, const math::mat4& transformA, const math::mat4& transformB, PointerEncapsulator<HalfEdgeFace>&refFace, float& maximumSeperation,bool shouldDebug = false)
-        {
-            //shouldDebug = false;
-
-            float currentMaximumSeperation = std::numeric_limits<float>::lowest();
-
-            for (auto face : convexB->GetHalfEdgeFaces())
-            {
-
-                //log::debug("face->normal {} ", math::to_string( face->normal));
-                //get inverse normal
-                math::vec3 seperatingAxis = math::normalize(transformB * math::vec4((face->normal), 0));
-
-                math::vec3 transformedPositionB = transformB * math::vec4(face->centroid, 1);
-
-                //get extreme point of other face in normal direction
-                math::vec3 worldSupportPoint;
-                GetSupportPoint(transformedPositionB, -seperatingAxis,
-                    convexA, transformA, worldSupportPoint);
-
-                float seperation = math::dot(worldSupportPoint - transformedPositionB, seperatingAxis);
-
-                if (seperation > currentMaximumSeperation)
-                {
-                    currentMaximumSeperation = seperation;
-                    refFace.ptr = face;
-                }
-
-                if (seperation > 0)
-                {
-                    //we have found a seperating axis, we can exit early
-                    maximumSeperation = currentMaximumSeperation;
-                    return true;
-                }
-            }
-            //no seperating axis was found
-            maximumSeperation = currentMaximumSeperation;
-
-            return false;
-        }
+            , ConvexCollider* convexB, const math::mat4& transformA, const math::mat4& transformB,
+            PointerEncapsulator<HalfEdgeFace>& refFace,
+            float& maximumSeperation, bool shouldDebug = false);
+      
 
         /** @brief Given 2 ConvexColliders, Goes through every single possible edge combination in order to check for a valid seperating axis. This is done
          * by creating a minkowski face with each edge combination.
@@ -267,7 +213,7 @@ namespace legion::physics
         * @param p3 The start of the third line
         * @param p4 The end of the fourth line
         */
-        static void FindClosestPointsToLineSegment(math::vec3 p1, math::vec3 p2,
+        static void FindClosestPointsBetweenLineSegments(math::vec3 p1, math::vec3 p2,
             math::vec3 p3, math::vec3 p4,math::vec3& outp1p2, math::vec3& outp3p4)
         {
             //------------------find the interpolants of both lines that represent the closest points of the line segments-----------//
@@ -379,7 +325,7 @@ namespace legion::physics
                 return false;
             }
 
-            float t = FindLineToPointInterpolant(startPoint, endPoint, planePosition, planeNormal);
+            float t = FindLineToPlaneInterpolant(startPoint, endPoint, planePosition, planeNormal);
 
             intersectionPoint = startPoint + direction * t;
 
@@ -400,7 +346,7 @@ namespace legion::physics
                 return false;
             }
 
-            interpolant = FindLineToPointInterpolant(startPoint, endPoint, planePosition, planeNormal);
+            interpolant = FindLineToPlaneInterpolant(startPoint, endPoint, planePosition, planeNormal);
             
 
             intersectionPoint = startPoint + direction * interpolant;
@@ -409,17 +355,24 @@ namespace legion::physics
         }
 
 
-
         /** Given a line going from a startPoint to and endPoint, finds the interpolant required to intersect a given 3D plane
         */
-        static float FindLineToPointInterpolant(const math::vec3& startPoint, const math::vec3& endPoint, const math::vec3& planePosition,
+        static float FindLineToPlaneInterpolant(const math::vec3& startPoint, const math::vec3& endPoint, const math::vec3& planePosition,
             const math::vec3& planeNormal)
         {
             return math::dot(planePosition - startPoint, planeNormal) / math::dot(endPoint - startPoint, planeNormal);
         }
 
+        /** Given a line going from 'startPoint' with a direction of 'lineDirection'
+        * endPoint and a point at 'pointPosition', finds the interpolant that represents the point in the line closest to 'pointPosition'
+        */
+        static float FindClosestPointToLineInterpolant(const math::vec3& startPoint, const math::vec3& lineDirection, const math::vec3& pointPosition);
+
+        static math::vec3 FindClosestPointToLineSegment(const math::vec3& start, const math::vec3& end, const math::vec3& pointPosition);
 
 
+
+        //------------------------------------------------------------ Voronoi Diagrams -----------------------------------------------------------------------//
 
         /**Creates a Voronoi diagram based on the given parameters.
         * @param points A list of points these will serve as the points of the voronoi diagram.
@@ -515,40 +468,23 @@ namespace legion::physics
             return CollideAABB(low0, high0, low1, high1);
         }
 
+        //------------------------------------------------------------ Quickhull -----------------------------------------------------------------------//
+
+        static std::shared_ptr<ConvexCollider> generateConvexHull(const std::vector<math::vec3>& vertices);
+
+        static void calculateNewellPlane(const std::vector<math::vec3>& v, math::vec3& outPlaneNormal, float& distToCentroid);
+
+        static bool isNewellFacesCoplanar(HalfEdgeFace* first, HalfEdgeFace* second, HalfEdgeEdge* connectingEdge, float scalingEpsilon, math::vec3& outNormal, int skipCount);
+
+
     private:
 
         /** @brief Given 2 HalfEdgeEdges and their respective transforms, transforms their normals and checks if they create a minkowski face
          * @return returns true if a minkowski face was succesfully constructed
          */
         static bool attemptBuildMinkowskiFace(HalfEdgeEdge* edgeA, HalfEdgeEdge* edgeB, const math::mat4& transformA,
-            const math::mat4& transformB)
-        {
-            //TODO the commmented parts are technically more robust and should work but somehow dont, figure out why.
-
-            const math::vec3 transformedA1 = transformA *
-                math::vec4(edgeA->getLocalNormal(), 0);
-
-            const math::vec3 transformedA2 = transformA *
-                math::vec4(edgeA->pairingEdge->getLocalNormal(), 0);
-
-            const math::vec3 transformedEdgeDirectionA = math::cross(transformedA1, transformedA2);
-            //transformA * math::vec4(edgeA->getLocalEdgeDirection(), 0);
-           
-            const math::vec3 transformedB1 = transformB *
-                math::vec4(edgeB->getLocalNormal(), 0);
-
-            const math::vec3 transformedB2 = transformB *
-                math::vec4(edgeB->pairingEdge->getLocalNormal(), 0);
-
-            const math::vec3 transformedEdgeDirectionB = math::cross(-transformedB1, -transformedB2);
-            //transformB *math::vec4(edgeB->getLocalEdgeDirection(), 0);
-                
-
-            math::vec3 positionA = transformA * math::vec4(edgeA->edgePosition, 1);
-
-            return isMinkowskiFace(transformedA1, transformedA2, -transformedB1, -transformedB2
-                , transformedEdgeDirectionA, transformedEdgeDirectionB);
-        }
+            const math::mat4& transformB);
+        
 
         /** @brief Given 2 arcs, one that starts from transformedA1 and ends at transformedA2 and another arc
          * that starts at transformedB1 and ends at transformedB2, checks if the given arcs collider each other
@@ -556,53 +492,31 @@ namespace legion::physics
          */
         static bool isMinkowskiFace(const math::vec3& transformedA1, const math::vec3& transformedA2,
             const math::vec3& transformedB1, const math::vec3& transformedB2
-            ,const math::vec3& planeANormal, const math::vec3& planeBNormal)
-        {
-            //------------------------ Check if normals created by arcA seperate normals of B --------------------------------------//
-            //CBA
-            float planeADotB1 = math::dot(planeANormal, transformedB1);
-            //DBA
-            float planeADotB2 = math::dot(planeANormal, transformedB2);
+            , const math::vec3& planeANormal, const math::vec3& planeBNormal);
+        
 
-            float dotMultiplyResultA =
-                planeADotB1 * planeADotB2;
+        //------------------------------------------------------------ Quickhull Helpers-----------------------------------------------------------------------//
 
-            //log::debug("dotMultiplyResultA {}", dotMultiplyResultA);
+        static bool buildInitialHull(const std::vector<math::vec3>& vertices, std::array<math::vec3,6>& supportPoints,  std::vector<HalfEdgeFace*>& outFaces,
+            math::mat4 DEBUG_transform = math::mat4(1.0f));
 
-            if (dotMultiplyResultA > 0.0f )
-            {
-                return false;
-            }
+        static void createHalfEdgeFaceFromEyePoint(const math::vec3 eyePoint,
+            const std::vector<HalfEdgeEdge*>& reversedEdges, std::vector<HalfEdgeFace*>& createdFaces);
 
-            //------------------------ Check if normals created by arcB seperate normals of A --------------------------------------//
+        static bool foundFaceWithOutsideVert(std::list<ColliderFaceToVert>& facesWithOutsideVerts, PointerEncapsulator< ColliderFaceToVert>& outChosenFace);
+        
+        static void partitionVerticesToList(const std::vector<math::vec3> vertices, 
+            std::list<ColliderFaceToVert>& outFacesWithOutsideVerts);
 
-            //ADC
-            float planeBDotA1 = math::dot(planeBNormal, transformedA1);
-            //BDC
-            float planeBDotA2 = math::dot(planeBNormal, transformedA2);
+        static void findHorizonEdgesFromFaces(const math::vec3& eyePoint,
+            std::vector<HalfEdgeFace*>& faces, std::vector<HalfEdgeEdge*>& outHorizonEdges,float scalingEpsilon);
 
-            float  dotMultiplyResultB = planeBDotA1 * planeBDotA2;
+        static void mergeVertexToHull(const math::vec3& eyePoint, std::list<ColliderFaceToVert>& facesWithOutsideVerts,
+            float scalingEpsilon);
 
-            //log::debug("dotMultiplyResultB {}", dotMultiplyResultB);
+        static bool isFacesConcave(HalfEdgeFace* first, HalfEdgeFace* second);
 
-            if (dotMultiplyResultB > 0.0f )
-            {
-                return false;
-            }
 
-            //------------------------ Check if arcA and arcB are in the same hemisphere --------------------------------------------//
-
-            float dotMultiplyResultAB = planeADotB1 * planeBDotA2;
-
-            //log::debug("dotMultiplyResultAB {}", dotMultiplyResultAB);
-
-            if (planeADotB1  * planeBDotA2  < 0.0f)
-            {
-                return false;
-            }
-
-            return true;
-        }
     };
 }
 

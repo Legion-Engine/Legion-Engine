@@ -15,6 +15,12 @@ struct largeExplosion : public app::input_action<largeExplosion> {};
 
 struct explosion : public app::input_action<explosion> {};
 
+struct QHULL : public app::input_action<QHULL>{};
+struct AddRigidbody : public app::input_action<AddRigidbody> {};
+struct ObjectToFollow
+{
+    ecs::entity_handle ent;
+};
 
 namespace legion::physics
 {
@@ -35,7 +41,10 @@ namespace legion::physics
             , math::vec3 velocity = math::vec3(), float explosionStrength = 0.0f, float explosionTime = FLT_MAX,
             math::vec3 impactPoint = math::vec3(-69.0f,0.0f,0.0f), bool hasCollider = true);
 
-        void OnSplit(physics_split_test* action);
+        //SCENES
+        void fractureVideoScene();
+
+        void quickhullTestScene();
 
         void meshSplittingTest(rendering::model_handle planeH, rendering::model_handle cubeH
             , rendering::model_handle cylinderH, rendering::model_handle complexH, rendering::material_handle TextureH);
@@ -43,15 +52,28 @@ namespace legion::physics
         void collisionResolutionTest(rendering::model_handle cubeH,
             rendering::material_handle wireframeH);
 
-        void fractureVideoScene();
+        //SCENE HELPERS
+        void createQuickhullTestObject(math::vec3 position, rendering::model_handle cubeH, rendering::material_handle TextureH,math::mat3 inertia = math::mat3(6.0f));
 
+        void PopulateFollowerList(ecs::entity_handle physicsEnt,int index);
+       
+        void addStaircase(math::vec3 position,float breadthMult = 1.0f);
+        //FUNCTION BINDED ACTIONS
         void prematureExplosion(explosion* action);
 
+        void OnSplit(physics_split_test* action);
+
+        void extendedContinuePhysics(extendedPhysicsContinue* action);
+
+        void OneTimeContinuePhysics(nextPhysicsTimeStepContinue* action);
+
+        void quickHullStep(QHULL * action);
+
+        void AddRigidbodyToQuickhulls(AddRigidbody * action);
+
+        void drawPhysicsColliders();
+
         void numericalRobustnessTest();
-
-        void extendedContinuePhysics(extendedPhysicsContinue * action);
-
-        void OneTimeContinuePhysics(nextPhysicsTimeStepContinue * action);
 
         void spawnCubeStack(math::vec3 start);
 
@@ -74,6 +96,7 @@ namespace legion::physics
 
         void explodeAThing(time::span);
 
+
         enum explosionType : int
         {
             NO_BOOM = 0,
@@ -91,7 +114,10 @@ namespace legion::physics
         rendering::material_handle concreteH;
         rendering::material_handle tileH;
         rendering::material_handle directionalLightMH;
+        rendering::material_handle vertexColor;
         rendering::material_handle brickH;
+        rendering::material_handle wireFrameH;
+   
 
         rendering::model_handle cubeH;
         rendering::model_handle concaveTestObject;
@@ -99,6 +125,12 @@ namespace legion::physics
         rendering::model_handle cylinderH;
         rendering::model_handle complexH;
         rendering::model_handle directionalLightH;
+   
+        //convex hull tests
+        rendering::model_handle colaH;
+        rendering::model_handle hammerH;
+        rendering::model_handle suzzaneH;
+        rendering::model_handle teapotH;
 
         ecs::entity_handle smallExplosionEnt;
         ecs::entity_handle mediumExplosionEnt;
@@ -106,5 +138,9 @@ namespace legion::physics
 
         ecs::entity_handle staticToAABBEntLinear, staticToAABBEntRotation, staticToOBBEnt, staticToEdgeEnt;
 
+
+        std::vector< ecs::entity_handle> registeredColliderColorDraw;
+
+        std::vector<std::vector<ecs::entity_handle>> folowerObjects;
     };
 }
