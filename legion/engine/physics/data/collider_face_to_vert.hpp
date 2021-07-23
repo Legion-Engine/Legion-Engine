@@ -27,8 +27,12 @@ namespace legion::physics
             face = other.face;
         }
 
+        /** @brief Given the positions in 'outsideVerts', gets the vertex furthest from the HalfEdgeFace 'face'
+         */
         std::pair<math::vec3,float> getFurthestOutsideVert() const;
-        
+       
+        /** @brief Given the vertices in 'vertVector', adds them to 'outsideVerts'
+         */
         void populateVectorWithVerts(std::vector<math::vec3>& vertVector);
 
         

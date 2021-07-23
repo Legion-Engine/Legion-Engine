@@ -146,7 +146,7 @@ namespace legion::physics
         //simpleMinecraftHouse();
         //explosionTest();
         //fractureVideoScene();
-        quickhullTestScene();
+        
         /*meshSplittingTest(planeH, cubeH
             , cylinderH, complexH, textureH);*/
 
@@ -167,12 +167,19 @@ namespace legion::physics
         createProcess<&PhysicsFractureTestSystem::colliderDraw>("Physics",0.02f);
         createProcess<&PhysicsFractureTestSystem::explodeAThing>("Physics");
 
+        //sceneDelegates.sceneInit = [this]() {PhysicsFractureTestSystem::quickhullTestScene(); };
+        //sceneDelegates.sceneRuntime = nullptr;
+        //
+        //sceneDelegates.sceneInit();
+        quickhullTestScene();
+        //BoxStackScene();
+
         Fracturer::registry = m_ecs;
     }
 
     void PhysicsFractureTestSystem::colliderDraw(time::span dt)
     {
-        drawPhysicsColliders();
+        //drawPhysicsColliders();
 
         auto query = createQuery<ObjectToFollow>();
         query.queryEntities();
@@ -816,11 +823,24 @@ namespace legion::physics
         }
     }
 
-    void PhysicsFractureTestSystem::addStaircase(math::vec3 position, float breadthMult)
+    void PhysicsFractureTestSystem::BoxStackScene()
+    {
+        cube_collider_params cubeParams;
+        cubeParams.breadth = 1.0f;
+        cubeParams.height = 1.0f;
+        cubeParams.width = 1.0f;
+        
+        createStack(5, 5, 5, math::vec3(3.0f,0,3.0f), math::vec3(1.0f),
+            cubeH, rockTextureH, cubeParams);
+
+        addStaircase(math::vec3(5.0f, -1, 5.0f), 10.0f, 10.0f);
+    }
+
+    void PhysicsFractureTestSystem::addStaircase(math::vec3 position, float breadthMult, float widthMult )
     {
         physics::cube_collider_params cubeParams;
         cubeParams.breadth = breadthMult;
-        cubeParams.width = 27.0f;
+        cubeParams.width = widthMult;
         cubeParams.height = 1.0f;
 
         auto ent = m_ecs->createEntity();
@@ -1699,64 +1719,6 @@ namespace legion::physics
         }
     }
 
-    ecs::entity_handle PhysicsFractureTestSystem::CreateSplitTestBox(physics::cube_collider_params cubeParams,math::vec3 position,
-        math::quat rotation, rendering::material_handle mat, bool isFracturable,bool hasRigidbody
-        ,math::vec3 velocity,float explosionStrength,float explosionTime, math::vec3 impactPoint, bool hasCollider)
-    {
-        auto ent = m_ecs->createEntity();
-  
-
-        if (hasRigidbody)
-        {
-           auto rbH = ent.add_component<rigidbody>();
-           auto rb = rbH.read();
-           rb.velocity = velocity;
-           rbH.write(rb);
-        }
-
-        if (isFracturable)
-        {
-            ent.add_component<physics::Fracturer>();
-            auto FractureCountdownH = ent.add_component<physics::FractureCountdown>();
-            auto fractureCountdown = FractureCountdownH.read();
-            fractureCountdown.explosionPoint = static_cast<int>(impactPoint.x) == -69 ?  position : impactPoint;
-            fractureCountdown.fractureStrength = explosionStrength;
-            fractureCountdown.fractureTime = explosionTime;
-
-            FractureCountdownH.write(fractureCountdown);
-        }
-
-
-        physics::physicsComponent physicsComponent2;
-
-        if (hasCollider)
-        {
-            auto entPhyHande = ent.add_component<physics::physicsComponent>();
-            physicsComponent2.AddBox(cubeParams);
-            entPhyHande.write(physicsComponent2);
-        }
-
-
-   
-
-        ent.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(mat));
-
-        auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(ent);
-        positionH.write(position);
-        scaleH.write(math::vec3(1.0f, 1.0f, 1.0f));
-        rotationH.write(rotation);
-
-        if (isFracturable)
-        {
-            auto splitterH = ent.add_component<physics::MeshSplitter>();
-            auto splitter = splitterH.read();
-            splitter.InitializePolygons(ent);
-            splitterH.write(splitter);
-        }
-
-        return  ent;
-    }
-
     void PhysicsFractureTestSystem::createFloor(int xCount, int yCount, math::vec3 start,
         math::vec3 offset, rendering::model_handle cubeH,std::vector< rendering::material_handle> materials,
         std::vector<int> ignoreJ, std::vector<bool> shouldFracture, float fractureTime ,
@@ -1796,6 +1758,106 @@ namespace legion::physics
                 k++;
             }
         }
+    }
+
+    void PhysicsFractureTestSystem::createStack(int widthCount, int breadthCount, int heightCount, math::vec3 firstBlockPos, math::vec3 offset,
+        rendering::model_handle cubeH, rendering::material_handle materials, physics::cube_collider_params cubeParams, bool rigidbody , float mass , math::mat3 inverseInertia )
+    {
+        for (size_t y = 0; y < heightCount; y++)
+        {
+            for (size_t x = 0; x < widthCount; x++)
+            {
+                for (size_t z = 0; z < breadthCount; z++)
+                {
+                    math::vec3 finalPos = firstBlockPos + math::vec3(offset.x * x, offset.y * y, offset.z * z);
+                    createBoxEntity(finalPos, cubeH, materials, cubeParams,rigidbody,mass,inverseInertia);
+                }
+            }
+        }
+    }
+
+    void PhysicsFractureTestSystem::createBoxEntity(math::vec3 position, rendering::model_handle cubeH,
+        rendering::material_handle materials, physics::cube_collider_params cubeParams, bool rigidbody , float mass , math::mat3 inverseInertia )
+    {
+        auto ent = m_ecs->createEntity();
+
+        if (rigidbody)
+        {
+            auto rbH = ent.add_component<physics::rigidbody>();
+            auto rb = rbH.read();
+            rb.setMass(mass);
+            rb.localInverseInertiaTensor = inverseInertia;
+
+            rbH.write(rb);
+        }
+
+        physics::physicsComponent physicsComponent;
+        auto entPhyHande = ent.add_component<physics::physicsComponent>();
+        physicsComponent.AddBox(cubeParams);
+        entPhyHande.write(physicsComponent);
+
+        ent.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(materials));
+
+        auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(ent);
+        positionH.write(position);
+    }
+
+    ecs::entity_handle PhysicsFractureTestSystem::CreateSplitTestBox(physics::cube_collider_params cubeParams, math::vec3 position,
+        math::quat rotation, rendering::material_handle mat, bool isFracturable, bool hasRigidbody
+        , math::vec3 velocity, float explosionStrength, float explosionTime, math::vec3 impactPoint, bool hasCollider)
+    {
+        auto ent = m_ecs->createEntity();
+
+
+        if (hasRigidbody)
+        {
+            auto rbH = ent.add_component<rigidbody>();
+            auto rb = rbH.read();
+            rb.velocity = velocity;
+            rbH.write(rb);
+        }
+
+        if (isFracturable)
+        {
+            ent.add_component<physics::Fracturer>();
+            auto FractureCountdownH = ent.add_component<physics::FractureCountdown>();
+            auto fractureCountdown = FractureCountdownH.read();
+            fractureCountdown.explosionPoint = static_cast<int>(impactPoint.x) == -69 ? position : impactPoint;
+            fractureCountdown.fractureStrength = explosionStrength;
+            fractureCountdown.fractureTime = explosionTime;
+
+            FractureCountdownH.write(fractureCountdown);
+        }
+
+
+        physics::physicsComponent physicsComponent2;
+
+        if (hasCollider)
+        {
+            auto entPhyHande = ent.add_component<physics::physicsComponent>();
+            physicsComponent2.AddBox(cubeParams);
+            entPhyHande.write(physicsComponent2);
+        }
+
+
+
+
+        ent.add_components<rendering::mesh_renderable>(mesh_filter(cubeH.get_mesh()), rendering::mesh_renderer(mat));
+
+        auto [positionH, rotationH, scaleH] = m_ecs->createComponents<transform>(ent);
+        positionH.write(position);
+        scaleH.write(math::vec3(1.0f, 1.0f, 1.0f));
+        rotationH.write(rotation);
+
+        if (isFracturable)
+        {
+            auto splitterH = ent.add_component<physics::MeshSplitter>();
+            auto splitter = splitterH.read();
+            splitter.InitializePolygons(ent);
+            splitterH.write(splitter);
+        }
+
+        return  ent;
     }
 
     void PhysicsFractureTestSystem::smallExplosionTest(smallExplosion* action)

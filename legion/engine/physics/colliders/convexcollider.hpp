@@ -377,6 +377,9 @@ namespace legion::physics
             }
         }
 
+        /**@brief populates the vertices vector with the 
+         * edge positions of the each face in halfEdgeFace
+         */
         void PopulateVertexListWithHalfEdges();
 
     private:

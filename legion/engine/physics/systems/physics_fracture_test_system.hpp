@@ -17,6 +17,7 @@ struct explosion : public app::input_action<explosion> {};
 
 struct QHULL : public app::input_action<QHULL>{};
 struct AddRigidbody : public app::input_action<AddRigidbody> {};
+
 struct ObjectToFollow
 {
     ecs::entity_handle ent;
@@ -34,6 +35,14 @@ namespace legion::physics
 
     private:
 
+        struct PhysicsSceneDelegates
+        {
+            legion::core::delegate<void()> sceneInit;
+            legion::core::delegate<void()> sceneRuntime;
+        };
+
+        PhysicsSceneDelegates sceneDelegates;
+
         void CreateElongatedFloor(math::vec3 position,math::quat rot, math::vec3 scale, rendering::material_handle mat, bool hasCollider =true);
 
         ecs::entity_handle CreateSplitTestBox(physics::cube_collider_params cubeParams, math::vec3 position,
@@ -46,6 +55,8 @@ namespace legion::physics
 
         void quickhullTestScene();
 
+        void BoxStackScene();
+
         void meshSplittingTest(rendering::model_handle planeH, rendering::model_handle cubeH
             , rendering::model_handle cylinderH, rendering::model_handle complexH, rendering::material_handle TextureH);
 
@@ -57,7 +68,7 @@ namespace legion::physics
 
         void PopulateFollowerList(ecs::entity_handle physicsEnt,int index);
        
-        void addStaircase(math::vec3 position,float breadthMult = 1.0f);
+        void addStaircase(math::vec3 position,float breadthMult = 1.0f,float widthMult = 27.0f);
         //FUNCTION BINDED ACTIONS
         void prematureExplosion(explosion* action);
 
@@ -89,6 +100,13 @@ namespace legion::physics
             math::vec3 offset, rendering::model_handle cubeH, std::vector< rendering::material_handle> materials
             , std::vector<int> ignoreJ, std::vector<bool> shouldFracture , float fractureTime = FLT_MAX,
             math::vec3 impactPoint = math::vec3(), bool hasRigidbodies = false,float strength =0.0f,bool hasCollider = true);
+
+        void createStack(int widthCount, int breadthCount, int heightCount,
+            math::vec3 firstBlockPos, math::vec3 offset, rendering::model_handle cubeH,
+            rendering::material_handle materials, physics::cube_collider_params cubeParams,bool rigidbody = true, float mass = 1.0f, math::mat3 inverseInertia = math::mat3(6.f));
+
+        void createBoxEntity(math::vec3 position, rendering::model_handle cubeH,
+            rendering::material_handle materials, physics::cube_collider_params cubeParams, bool rigidbody = true, float mass = 1.0f, math::mat3 inverseInertia = math::mat3(6.f));
 
         void smallExplosionTest(smallExplosion*action);
         void mediumExplosionTest(mediumExplosion*action);

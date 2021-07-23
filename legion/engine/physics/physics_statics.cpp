@@ -415,7 +415,16 @@ namespace legion::physics
 
     std::shared_ptr<ConvexCollider> PhysicsStatics::generateConvexHull(const std::vector<math::vec3>& vertices)
     {
-        //[1] Calculate scaled epsilon
+        //[1] Calculated a scaled epsilon based on the extents of the hull. This ensures that epsilon takes the size of the hull into account.
+        //[2] Calculate a visibility epsilon that determines if a vertex should be merged to the hull or not.
+        //[3] Calculate the support points in x,y,z axis of the given vertices in order to create the initial hull
+        //[4] Create the initial hull given the calculated support points
+        //[5] Given the vector of vertices called 'vertices', partition them to the initial hull
+        //[6] While there is still a face in the constructed hull with a vertex that is not merged, merge the vertex
+        //[7] Populate the new ConvexCollider's face vector with the faces generated from the previous step
+        //[8] Populate the new ConvexCollider's vertex vector with the vertices merged from the previous step
+
+        //[1] Calculated a scaled epsilon based on the extents of the hull. This ensures that epsilon takes the size of the hull into account.
         const static float initialEpsilon = math::sqrt( math::epsilon<float>() );
 
         math::vec3 maxInDimension(std::numeric_limits<float>::lowest());
@@ -441,33 +450,35 @@ namespace legion::physics
         //epsilon must take into account span of vertices
         float dimensionSum = 3 * ( maxInDimension.x + maxInDimension.y + maxInDimension.z );
         const float scaledEpsilon = dimensionSum * initialEpsilon;
+
+        //[2] Calculate a visibility epsilon that determines if a vertex should be merged to the hull or not.
         const float visibilityEpsilon = dimensionSum * math::pow(math::epsilon<float>(), 1.0f / 2.5f);
 
         std::vector<HalfEdgeFace*> faces;
         faces.reserve(4);
 
-        //[3] Measure extents of mesh
+        //[3] Calculate the support points in x,y,z,-x,-y,-z axis of the given vertices in order to create the initial hull
         std::array<math::vec3, 6> supportVertices;
 
-        //(1.1) Get support points in -x and x
+        //Get support points in -x and x
         GetSupportPoint(vertices, math::vec3(1, 0, 0), supportVertices.at(0));
         GetSupportPoint(vertices, math::vec3(-1, 0, 0), supportVertices.at(1));
 
-        //(1.2) Get support points in -y and y
+        //Get support points in -y and y
         GetSupportPoint(vertices, math::vec3(0, 1, 0), supportVertices.at(2));
         GetSupportPoint(vertices, math::vec3(0, -1, 0), supportVertices.at(3));
 
-        //(1.3) Get support points in -z and z
+        //Get support points in -z and z
         GetSupportPoint(vertices, math::vec3(0, 0, 1), supportVertices.at(4));
         GetSupportPoint(vertices, math::vec3(0, 0, -1), supportVertices.at(5));
 
-        //[2] Build Initial Hull
-        if (!buildInitialHull(vertices, supportVertices, faces,math::mat4(1.0f)))
+        //[4] Create the initial hull given the calculated support points
+        if (!buildInitialHull(vertices, supportVertices, faces))
         {
             return nullptr;
         }
         
-        //[3] populate list with faces of initial hull
+        //[5] Given the vector of vertices called 'vertices', partition them to the initial hull
         std::list<ColliderFaceToVert> facesWithOutsideVerts;
         for (HalfEdgeFace* face : faces)
         {
@@ -476,7 +487,7 @@ namespace legion::physics
 
         partitionVerticesToList(vertices, facesWithOutsideVerts);
 
-        //[4] loop through faces until there are no faces with unmerged vertices
+        //[6] While there is still a face in the constructed hull with a vertex that is not merged, merge the vertex
         if (!facesWithOutsideVerts.empty())
         {
             PointerEncapsulator< ColliderFaceToVert> currentFaceToVert;
@@ -501,6 +512,7 @@ namespace legion::physics
 
         }
 
+        //[7] Populate the new ConvexCollider's face vector with the faces generated from the previous step
         auto convexCollider = std::make_shared<ConvexCollider>();
         auto& halfEdgesVector = convexCollider->GetHalfEdgeFaces();
 
@@ -509,7 +521,7 @@ namespace legion::physics
             halfEdgesVector.push_back(faceToVert.face);
         }
         
-        //populate list of vertices in collider list
+        //[8] Populate the new ConvexCollider's vertex vector with the vertices merged from the previous step
         convexCollider->PopulateVertexListWithHalfEdges();
 
         return convexCollider;
@@ -530,7 +542,7 @@ namespace legion::physics
            
         // Normalize normal and fill in the plane equation fields
         outPlaneNormal = math::normalize(outPlaneNormal);
-        distToCentroid = math::dot(centroid, outPlaneNormal) / v.size(); // “centroid / n” is the true centroid point
+        distToCentroid = math::dot(centroid, outPlaneNormal) / v.size(); // ï¿½centroid / nï¿½ is the true centroid point
     }
 
     bool PhysicsStatics::attemptBuildMinkowskiFace(HalfEdgeEdge* edgeA, HalfEdgeEdge* edgeB, const math::mat4& transformA, const math::mat4& transformB)
@@ -608,7 +620,7 @@ namespace legion::physics
     }
 
     bool PhysicsStatics::buildInitialHull(const std::vector<math::vec3>& vertices,
-        std::array<math::vec3,6>& supportVertices, std::vector<HalfEdgeFace*>& faces, math::mat4 DEBUG_transform )
+        std::array<math::vec3,6>& supportVertices, std::vector<HalfEdgeFace*>& faces )
     {
         //Summary:
         //[1] Find the 2 most distant vertices in 'support Vertices'
@@ -625,7 +637,7 @@ namespace legion::physics
         math::vec3& firstDistant = supportVertices.at(0);
         math::vec3& secondDistant = supportVertices.at(1);
 
-        //(1.1) Iterate through support vertices to find the combination of vertices that represent the 2 most distant points
+        //Iterate through support vertices to find the combination of vertices that represent the 2 most distant points
         for (int i = 0; i < supportVertices.size(); i++)
         {
             math::vec3& first = supportVertices.at(i);
@@ -645,14 +657,6 @@ namespace legion::physics
             }
         }
 
-        //DEBUG draw most distant
-      /*  {
-            math::vec3 transformFirst = DEBUG_transform * math::vec4(firstDistant, 1);
-            math::vec3 transformSecond = DEBUG_transform * math::vec4(secondDistant, 1);
-
-            debug::drawLine(transformFirst, transformSecond,math::colors::red,5.0f,FLT_MAX,true);
-        }*/
-
         //[2] Find the vertex most distant from the line created by the 2 most distance vertices
 
         math::vec3 firstToSecond = math::normalize(secondDistant - firstDistant);
@@ -660,10 +664,10 @@ namespace legion::physics
         const math::vec3* thirdDistant = nullptr;
         mostDistant = std::numeric_limits<float>::lowest();
 
-        //(2.1) Iterate through 'vertices' to find the vertex most distant from line 
+        //Iterate through 'vertices' to find the vertex most distant from line 
         for (auto& vertex : vertices)
         {
-            //(2.1.1) Check if vertex and firstDistant create a line segment parralel to the line segment created by 'firstToSecond'
+            //Check if vertex and firstDistant create a line segment parralel to the line segment created by 'firstToSecond'
             float dotResult = math::dot(math::normalize(vertex - firstDistant), firstToSecond);
 
             if (math::close_enough(dotResult, 1.0f))
@@ -671,12 +675,12 @@ namespace legion::physics
                 continue;
             }
 
-            //(2.1.2) Find closest point between vertex and line segment
+            //Find closest point between vertex and line segment
             math::vec3 closestPoint = PhysicsStatics::FindClosestPointToLineSegment(firstDistant, secondDistant, vertex);
 
             float currentDistance = math::distance2(closestPoint, vertex);
 
-            //(2.1.3) Store vertex if it is further than the current known most distant
+            //Store vertex if it is further than the current known most distant
             if (currentDistance > mostDistant)
             {
                 mostDistant = currentDistance;
@@ -689,35 +693,28 @@ namespace legion::physics
             return false;
         }
 
-        //DEBUG draw most distant
-      /*  {
-            math::vec3 transformFirst = DEBUG_transform * math::vec4(*thirdDistant, 1);
-
-            debug::drawLine(transformFirst, transformFirst + math::vec3(0,0.1f,0), math::colors::blue, 5.0f, FLT_MAX, true);
-        }*/
-
         //[3] Create first collider face using that line and the vertex most distant to it
 
-        //(3.1) Initialize Half Edges
+        //Initialize Half Edges
         HalfEdgeEdge* firstEdge = new HalfEdgeEdge(firstDistant);
         HalfEdgeEdge* secondEdge = new HalfEdgeEdge(secondDistant);
         HalfEdgeEdge* thirdEdge = new HalfEdgeEdge(*thirdDistant);
 
-        //(3.2) Connect them to each other
+        //Connect them to each other
         firstEdge->setNextAndPrevEdge(thirdEdge, secondEdge);
         secondEdge->setNextAndPrevEdge(firstEdge, thirdEdge);
         thirdEdge->setNextAndPrevEdge(secondEdge, firstEdge);
 
-        //(3.3) Initialize Half Edge Faces
+        //Initialize Half Edge Faces
         HalfEdgeFace* initialFace = new HalfEdgeFace(firstEdge,
             math::normalize(math::cross(secondDistant - firstDistant, *thirdDistant - secondDistant)));
 
-        //(3.4) Add to collider
+        //Add to collider
         faces.push_back(initialFace);
 
         //[4] Find the most distant vertex from the plane where the first collider face lies
 
-        //(4.1) Iterate through vertices to the a point to plane check
+        //Iterate through vertices to the a point to plane check
         mostDistant = std::numeric_limits<float>::lowest();
         const math::vec3* firstEyePoint = nullptr;
 
@@ -743,7 +740,6 @@ namespace legion::physics
 
         math::color drawC = math::colors::blue;
        
-
         //[5] invert face if distant vertex is in front of face
 
         float eyePointDistance =
@@ -756,17 +752,9 @@ namespace legion::physics
             drawC = math::colors::red;
         }
 
-        //DEBUG draw most distant
-        /*{
-            math::vec3 transformFirst = DEBUG_transform * math::vec4(*firstEyePoint, 1);
-
-            debug::drawLine(transformFirst, transformFirst + math::vec3(0, 0.1f, 0), drawC, 5.0f, FLT_MAX, true);
-
-        }*/
-
         //[5] Create a set of faces connecting the first collider face to the most distant vertex
 
-        //(5.1) Reverse collect the edges of the initialFace
+        //Reverse collect the edges of the initialFace
 
         std::vector<HalfEdgeEdge*> reverseHalfEdgeList;
 
@@ -777,7 +765,7 @@ namespace legion::physics
 
         initialFace->forEachEdgeReverse(collectEdges);
 
-        //(5.2) For each edge create a new face that connects the initial face with the eyePoint
+        //For each edge create a new face that connects the initial face with the eyePoint
         math::vec3 eyePoint = *firstEyePoint;
 
         createHalfEdgeFaceFromEyePoint(eyePoint, reverseHalfEdgeList,faces);
@@ -836,7 +824,6 @@ namespace legion::physics
 
     bool PhysicsStatics::foundFaceWithOutsideVert(std::list<ColliderFaceToVert>& facesWithOutsideVerts, PointerEncapsulator< ColliderFaceToVert>& outChosenFace)
     {
-        int i = 0;
         for (auto& faceWithOutsideVert : facesWithOutsideVerts)
         {
             if (!faceWithOutsideVert.outsideVerts.empty())
@@ -844,7 +831,6 @@ namespace legion::physics
                 outChosenFace.ptr = &faceWithOutsideVert;
                 return true;
             }
-            i++;
         }
 
         return false;
@@ -853,13 +839,12 @@ namespace legion::physics
     void PhysicsStatics::partitionVerticesToList(const std::vector<math::vec3> vertices,
         std::list<ColliderFaceToVert>& outFacesWithOutsideVerts)
     {
-        //for each vertex in vertices
         for (const math::vec3& vertex : vertices)
         {
             ColliderFaceToVert* bestFaceToVert = nullptr;
             float bestMatchDistance = std::numeric_limits<float>::lowest();
 
-
+            //find the face that is most distant from the std::list of planes given by 'outFacesWithOutsideVerts'
             for (ColliderFaceToVert& faceToVert : outFacesWithOutsideVerts)
             {
                 auto face = faceToVert.face;
@@ -934,10 +919,19 @@ namespace legion::physics
     void PhysicsStatics::mergeVertexToHull(const math::vec3& eyePoint,std::list<ColliderFaceToVert>& facesWithOutsideVerts,
         float scalingEpsilon)
     {
+        //[1] identify faces that can see the 'eyePoint' and remove them from list
+        //[2] Find the horizon edges. These are the edges that neighbor a face that can see the eyePoint
+        //and a face that cannot
+        //[3] Given the horizon edges and the eye point. Create a new faces that merge the eyepoint
+        //[4] Merge all new faces until no coplanarity/concavity can be detected
+        //[5] Remove duplicate faces are generated while face merging
+        //[6] Repartition vertices that were placed in the unmergedVertices vector.
+        //[7] Delete all faces that were removed at step [1]
+
         std::vector<math::vec3> unmergedVertices;
         std::vector<HalfEdgeFace*> facesToBeRemoved;
           
-        //identify faces that can see vertex and remove them from list
+        //[1] identify faces that can see the 'eyePoint' and remove them from list
         for (auto listIter = facesWithOutsideVerts.begin(); listIter != facesWithOutsideVerts.end();)
         {
             HalfEdgeFace* face = listIter->face;
@@ -960,7 +954,8 @@ namespace legion::physics
             }
         }
         
-        //identify horizon edges and put them into list
+        //[2] Find the horizon edges. These are the edges that neighbor a face that can see the eyePoint
+        //and a face that cannot
         std::vector<HalfEdgeEdge*> horizonEdges;
         findHorizonEdgesFromFaces(eyePoint, facesToBeRemoved, horizonEdges,scalingEpsilon);
 
@@ -976,12 +971,12 @@ namespace legion::physics
             }
         }
 
+        //[3] Given the horizon edges and the eye point. Create a new faces that merge the eyepoint
         std::vector<HalfEdgeFace*> newFaces;
         newFaces.reserve(horizonEdges.size());
         createHalfEdgeFaceFromEyePoint(eyePoint, horizonEdges, newFaces);
 
-        //merge all new edges until no coplanarity/concavity can be detected
-
+        //[4] Merge all new faces until no coplanarity/concavity can be detected
         auto oldEndIter = facesWithOutsideVerts.end();
         oldEndIter--;
 
@@ -1026,6 +1021,9 @@ namespace legion::physics
                         HalfEdgeEdge* pairing = edge->pairingEdge;
                         HalfEdgeEdge* nextPairing = edge->nextEdge->pairingEdge;
 
+                        //if this face a pair of adjacent edges that connect with the same face but they are not coplanar,
+                        //we essentially 'extend' the first edge and delete the other. We do the opposite for
+                        //its neighboring edge pair
                         if (pairing->face == nextPairing->face)
                         {
                             HalfEdgeEdge* oldNextEdge = edge->nextEdge;
@@ -1050,7 +1048,7 @@ namespace legion::physics
             } while (mergedInIteration);
         }
 
-        //duplicate faces are generated while face merging, remove them here
+        //[5] Remove duplicate faces are generated while face merging
         std::set<HalfEdgeFace*> uniqueFaces;
         for (auto listIter = facesWithOutsideVerts.begin(); listIter != facesWithOutsideVerts.end();)
         {
@@ -1071,8 +1069,10 @@ namespace legion::physics
             }
         }
 
+        //[6] Repartition vertices that were placed in the unmergedVertices vector.
         partitionVerticesToList(unmergedVertices, facesWithOutsideVerts);
 
+        //[7] Delete all faces that were removed at step [1]
         for (auto face : facesToBeRemoved)
         {
             delete face;

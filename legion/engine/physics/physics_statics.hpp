@@ -470,11 +470,25 @@ namespace legion::physics
 
         //------------------------------------------------------------ Quickhull -----------------------------------------------------------------------//
 
+        /** @brief Generates a ConvexHull that encapsulates the given vertices through the Quickhull algorithm.
+         */
         static std::shared_ptr<ConvexCollider> generateConvexHull(const std::vector<math::vec3>& vertices);
 
+        /** @brief Generates a best fit plane that encapsulates the given vertices 'v' using the Newell Algorithm
+         */
         static void calculateNewellPlane(const std::vector<math::vec3>& v, math::vec3& outPlaneNormal, float& distToCentroid);
 
-        static bool isNewellFacesCoplanar(HalfEdgeFace* first, HalfEdgeFace* second, HalfEdgeEdge* connectingEdge, float scalingEpsilon, math::vec3& outNormal, int skipCount);
+        /** @brief Determines if 2 faces are coplanar using the Newell Algorithm and an epsilon
+         * @param first the first face that will be checked for coplanarity
+         * @param second the second face that will be checked for coplanarity
+         * @param connectingEdge an edge from the first face that connects the first and second face
+         * @param scalingEpsilon the tolerance of coplanarity
+         * @param the resulting normal if these faces are merged
+         * @param the number of edges that connect the first and second faces. This should be 1.
+         * @return Whether the faces are coplanar
+         */
+        static bool isNewellFacesCoplanar(HalfEdgeFace* first, HalfEdgeFace* second, HalfEdgeEdge* connectingEdge,
+            float scalingEpsilon, math::vec3& outNormal, int skipCount);
 
 
     private:
@@ -487,7 +501,7 @@ namespace legion::physics
         
 
         /** @brief Given 2 arcs, one that starts from transformedA1 and ends at transformedA2 and another arc
-         * that starts at transformedB1 and ends at transformedB2, checks if the given arcs collider each other
+         * that starts at transformedB1 and ends at transformedB2, checks if the given arcs intersect each other
          * @return returns true if the given arcs intersect
          */
         static bool isMinkowskiFace(const math::vec3& transformedA1, const math::vec3& transformedA2,
@@ -497,23 +511,48 @@ namespace legion::physics
 
         //------------------------------------------------------------ Quickhull Helpers-----------------------------------------------------------------------//
 
-        static bool buildInitialHull(const std::vector<math::vec3>& vertices, std::array<math::vec3,6>& supportPoints,  std::vector<HalfEdgeFace*>& outFaces,
-            math::mat4 DEBUG_transform = math::mat4(1.0f));
+        /** @brief Given a list of vertices and its support points in the x,y,z directions, determines the initial hull 
+         * @param vertices the vertices that will be used to generate the initial hull
+         * @param supportPoints the supportPoints of 'vertices' in the x,y,z,-x,-y,-z direction
+         * @param outFaces the faces generated
+         * @return returns true if the hull construction was succesfull
+         */
+        static bool buildInitialHull(const std::vector<math::vec3>& vertices, std::array<math::vec3,6>& supportPoints,  std::vector<HalfEdgeFace*>& outFaces);
 
+        /** @brief Given an 'eyePoint' and a vector of edges that represent the horizon of a convex hull from 'eyePoint'
+         * , creates a number of new faces that merge 'eyePoint' into the convex hull
+         * @param eyePoint the position of the eyePoint
+         * @param reversedEdges the edges that represent the horizon from 'eyePoint'
+         * @param createdFaces the faces created from merging 'eyePoint' into the hull
+         */
         static void createHalfEdgeFaceFromEyePoint(const math::vec3 eyePoint,
             const std::vector<HalfEdgeEdge*>& reversedEdges, std::vector<HalfEdgeFace*>& createdFaces);
 
+        /** @brief Returns true if the std::list 'facesWithOutsideVerts' contains
+         * an instance of ColliderToVert that has a non empty ColliderToVert::outsideVerts std::vector
+         */
         static bool foundFaceWithOutsideVert(std::list<ColliderFaceToVert>& facesWithOutsideVerts, PointerEncapsulator< ColliderFaceToVert>& outChosenFace);
-        
+
+        /** @brief Populates the ColliderToVert::outsideVerts member variable of the ColliderFaceToVerts in 'outFacesWithOutsideVerts'
+         * with 'vertices' based on a PointDistanceToPlane check.
+         */
         static void partitionVerticesToList(const std::vector<math::vec3> vertices, 
             std::list<ColliderFaceToVert>& outFacesWithOutsideVerts);
 
+        /** @brief given an 'eyePoint' and a number of faces that represent faces of a convex hull that can
+         * see the eyepoint, identifies the edges that represent the horizon from the eyePoint
+         */
         static void findHorizonEdgesFromFaces(const math::vec3& eyePoint,
             std::vector<HalfEdgeFace*>& faces, std::vector<HalfEdgeEdge*>& outHorizonEdges,float scalingEpsilon);
 
+        /** @brief Given an eyePoint, and a convex hull represented by 'facesWithOutsideVerts', merged the eyePoint
+         * into the hull. 
+         */
         static void mergeVertexToHull(const math::vec3& eyePoint, std::list<ColliderFaceToVert>& facesWithOutsideVerts,
             float scalingEpsilon);
 
+        /** @brief Given 2 faces, determines if they are concave based on their normals and centroids
+         */
         static bool isFacesConcave(HalfEdgeFace* first, HalfEdgeFace* second);
 
 
